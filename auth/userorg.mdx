@@ -1,0 +1,50 @@
+---
+title: Auth — UserOrg (Lern)
+description: Profile / user / org reads, data prerequisites, and the mock fallback.
+---
+
+UserOrg (the Lern service) serves the profile after login. The LMS proxies `/learner/user/*` and
+`/learner/org/*` to it.
+
+<CardGroup cols={2}>
+  <Card title="Container" icon="box">`lern-userorg`</Card>
+  <Card title="Port" icon="ethernet">`:9600`</Card>
+</CardGroup>
+
+## Backing stores
+
+| Store | For |
+| --- | --- |
+| Cassandra | `sunbird` keyspace: `user`, `user_roles`, `user_organisation`, `system_settings` |
+| Redis | Cache |
+| Elasticsearch | User search / org lookups |
+
+## Data prerequisites (fresh DB only)
+
+<AccordionGroup>
+  <Accordion title="user table columns">
+    `sunbird.user` must carry UserOrg's columns (`flagsvalue`, `channel`, `maskedemail`,
+    `maskedphone`, `alltncaccepted`) or reads 500. If a thinner table exists, `DROP TABLE
+    sunbird.user` then re-seed.
+  </Accordion>
+  <Accordion title="Encryption">
+    Set `sunbird_encryption=OFF` on the container, **or** all seeded email/phone must be
+    AES-encrypted — otherwise profile reads NPE in the decrypt path.
+  </Accordion>
+  <Accordion title="System settings">
+    `sunbird.system_settings` must contain `tncConfig` and `orgTypeConfig` rows (they're
+    field-indexed, iterated by `DataCacheHandler.cacheSystemConfig`).
+  </Accordion>
+  <Accordion title="Channel id">
+    `SUNBIRD_CHANNEL_ID` (`.env`) must match a real `sunbird.organisation.id`.
+  </Accordion>
+</AccordionGroup>
+
+## Mock fallback (resilience)
+
+<Info>
+  The proxy silently falls back to mock user/org data on `ECONNREFUSED` / `ETIMEDOUT` / 5xx with a
+  30s circuit breaker, so a UserOrg outage won't 502 the Profile page. Toggle with
+  `USE_MOCK_USERORG` (defaults to `USE_MOCK`). Implemented in
+  `server/src/routes/learner.routes.ts` (`makeUserorgProxy`).
+</Info>

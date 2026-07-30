@@ -1,0 +1,31 @@
+---
+title: Email — Startup
+description: Start listmonk and confirm EvalZero can send.
+---
+
+<Info>Containers: `sahyogi_listmonk_app` (`:9000`) + `listmonk_db` (`:5437`) · Optional</Info>
+
+## Start
+
+```bash
+docker start listmonk_db sahyogi_listmonk_app
+```
+
+## Verify
+
+```bash
+curl -s localhost:9000/api/health | jq
+```
+
+## Template sync
+
+EvalZero syncs its `evalzero-*` templates into listmonk on server startup
+(`syncEmailTemplates()`), creating or updating each. If a send reports
+`TEMPLATE_NOT_REGISTERED`, restart the LMS server so the sync runs, or confirm the template exists
+in the listmonk admin.
+
+<Note>
+  Email is fully optional. With listmonk stopped or `LISTMONK_TOKEN` unset, EvalZero logs
+  `listmonk not configured — email dropped` and carries on. No login or assessment flow depends on
+  it.
+</Note>

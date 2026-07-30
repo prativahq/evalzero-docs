@@ -1,0 +1,25 @@
+---
+title: Knowlg — Startup
+description: Start the Knowlg content service and verify health.
+---
+
+<Info>Folder: **`/home/sdas/evalzero/knowlg`** · Container `knowlg-content` · Port **`:9099`**</Info>
+
+## Start
+
+```bash
+docker start sunbird-local-cassandra-1 sunbird-local-neo4j-1 sunbird-local-redis-1 \
+             sunbird-local-elasticsearch-1 sunbird-local-minio-1 \
+             knowlg-content
+```
+
+## Verify
+
+```bash
+curl -s localhost:9099/health | jq   # redis + graph + cassandra
+```
+
+<Note>
+  Knowlg is an already-built container — `docker start` is all you need. It shares every infra store
+  with inQuiry, so if the databases are up for the assessment service, Knowlg needs nothing extra.
+</Note>

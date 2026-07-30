@@ -1,0 +1,58 @@
+---
+title: inQuiry — Overview
+description: Sunbird inQuiry assessment-service — questions, question sets and secure grading.
+---
+
+The **inQuiry assessment-service** is the Sunbird Question &amp; QuestionSet API. EvalZero uses it
+to author, play and grade assessments. It runs against the shared `sunbird-local` infra.
+
+<CardGroup cols={2}>
+  <Card title="Folder" icon="folder">
+    `/home/sdas/evalzero/evalzero-sunbird-inquiry`
+  </Card>
+  <Card title="Ports" icon="ethernet">
+    assessment `:9010` · search `:9011`
+  </Card>
+  <Card title="Container" icon="box">
+    `assessment-service` (host 9010 → container 9000)
+  </Card>
+  <Card title="Start" icon="play">
+    `docker start assessment-service search-service`
+  </Card>
+</CardGroup>
+
+## What it stores
+
+Questions and question sets split across two databases:
+
+| Store | Holds |
+| --- | --- |
+| **Neo4j** | Node metadata + graph relationships (`domain` label, `IL_UNIQUE_ID`) |
+| **Cassandra** | Heavy "external" props: body/answer blobs, `interactions`, `responseDeclaration`, `editorState` (JSON) |
+
+The split logic lives in knowlg-core `DataNode.scala` (`getExternalProps` / `saveExternalProperties`).
+
+## API surface
+
+| Route | Purpose |
+| --- | --- |
+| `POST /question/v4/create` | Create a question |
+| `GET /question/v4/read/:id` | Read a question |
+| `POST /questionset/v4/create` | Create a set |
+| `PATCH /questionset/v4/hierarchy/update` | Save questions inline |
+| `GET /questionset/v4/hierarchy/:id?mode=edit` | Read the draft tree (needs search) |
+
+## EvalZero wiring
+
+The LMS proxies `/api/question/*` and `/api/questionset/*` to `:9010` via
+`server/src/routes/inquiry.routes.ts`, plus secure `/play` + `/submit` endpoints that grade
+server-side. See [Scoring](/inquiry/scoring).
+
+<CardGroup cols={2}>
+  <Card title="Start it" icon="rocket" href="/inquiry/startup">
+    Bring up assessment + search.
+  </Card>
+  <Card title="Dependencies" icon="diagram-project" href="/inquiry/dependencies">
+    What it needs, and what's optional.
+  </Card>
+</CardGroup>

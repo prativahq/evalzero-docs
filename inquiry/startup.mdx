@@ -1,0 +1,52 @@
+---
+title: inQuiry — Startup
+description: Start the assessment and search services and verify health.
+---
+
+<Info>Folder: **`/home/sdas/evalzero/evalzero-sunbird-inquiry`** · Ports **9010 / 9011**</Info>
+
+## Start the inQuiry set
+
+Bring up the four dependencies plus the two services:
+
+```bash
+docker start sunbird-local-cassandra-1 sunbird-local-neo4j-1 sunbird-local-redis-1 \
+             search-service assessment-service
+```
+
+<Note>
+  `schema-http` is only needed by the async publish (Flink) pipeline — skip it for authoring,
+  playing and grading.
+</Note>
+
+## Verify
+
+```bash
+curl -s localhost:9010/health | jq   # 3 checks: cassandra + neo4j + redis
+curl -s localhost:9011/health | jq   # search: elasticsearch
+```
+
+A healthy `:9010` returns all three checks green. Then confirm a read path:
+
+```bash
+curl -s localhost:9010/questionset/v4/read/do_test  # 404 for a missing id is expected
+```
+
+## Rebuild (only if changed)
+
+The container is a Play dist built with Docker Maven (no host JDK). From the repo root:
+
+```bash
+docker run --rm -v $PWD:/app -v $HOME/.m2:/root/.m2 -w /app \
+  --platform linux/amd64 maven:3.9-eclipse-temurin-11 \
+  mvn clean install -DskipTests -Dmaven.test.skip=true
+```
+
+Then `play2:dist` the `assessment-service` module and re-run the container. The runtime layout
+(dist + config + schemas) lives under `assessment-runtime/` in the repo.
+
+<Warning>
+  The service reads category definitions from `dev_category_store.category_definition_data`
+  (Cassandra) + Neo4j. On a fresh DB you must seed the question/questionset category rows or
+  `create` returns `ResourceNotFoundException`. See [Dependencies](/inquiry/dependencies).
+</Warning>

@@ -1,0 +1,43 @@
+---
+title: RC — Overview
+description: Sunbird RC — the registry and credentialing stack behind certificates.
+---
+
+**Sunbird RC** (Registry &amp; Credentialing) issues and verifies the verifiable credentials behind
+certificates. It's a self-contained compose stack and is **optional** — EvalZero runs fully without
+it.
+
+<CardGroup cols={2}>
+  <Card title="Folder" icon="folder">`/home/sdas/evalzero/evalzero-sunbird-rc`</Card>
+  <Card title="Start" icon="play">`docker compose up -d`</Card>
+  <Card title="Gate" icon="toggle-on">`.env` `RC_ISSUE_ENABLED`</Card>
+  <Card title="Status" icon="circle-pause">Mostly stopped by default</Card>
+</CardGroup>
+
+## Services
+
+| Service | Container | Host port | Purpose |
+| --- | --- | --- | --- |
+| Registry (core) | `evalzero-sunbird-rc-registry-1` | `18091` | Entities / claims (`RC_BASE`) |
+| Credentials | `evalzero-sunbird-rc-credential-1` | `13000` | Issue / verify / render (`RC_CRED_BASE`) |
+| Credential schema | `evalzero-sunbird-rc-credential-schema-1` | `3333` | Schema service (`RC_SCHEMA_BASE`) |
+| Vault | `evalzero-sunbird-rc-vault-1` | `8200` | Signing keys |
+| Identity (Keycloak) | `evalzero-sunbird-rc-keycloak-1` | net | RC's own realm |
+| Support | db · es · redis · kafka · zookeeper | net | RC's backing stores |
+
+## EvalZero wiring (`.env`)
+
+```bash
+RC_BASE=http://localhost:18091         # registry
+RC_CRED_BASE=http://localhost:13000    # credentials
+RC_SCHEMA_BASE=http://localhost:3333   # credential-schema
+RC_ISSUE_ENABLED=true
+RC_ISSUER_DID=did:issuer:…
+RC_SCHEMA_ID=did:schema:…
+```
+
+<Warning>
+  Only `vault` runs by default; the rest of the RC stack is stopped. Bring the compose stack up
+  before issuing a certificate, then `docker ps` to confirm registry / credential / schema are
+  healthy.
+</Warning>

@@ -1,0 +1,44 @@
+---
+title: Auth — Overview
+description: How EvalZero authenticates — Keycloak for tokens, UserOrg for profiles.
+---
+
+EvalZero runs auth in **real mode** (`MOCK_AUTH=false`, `USE_MOCK=false`,
+`USE_MOCK_USERORG=false`). Two separate backends are involved.
+
+<CardGroup cols={2}>
+  <Card title="Keycloak" icon="key" href="/auth/keycloak">
+    Issues JWTs. `direct_grant` against realm `sunbird`, client `lms`. Port `:8080`.
+  </Card>
+  <Card title="UserOrg (Lern)" icon="user" href="/auth/userorg">
+    Serves user / org / profile data after login. Port `:9600`.
+  </Card>
+</CardGroup>
+
+## Login flow
+
+<Steps>
+  <Step title="POST /auth/login">
+    The Express proxy exchanges username/password at Keycloak's token endpoint.
+  </Step>
+  <Step title="Decode + session">
+    The JWT is decoded and a session (`lms_sid`) is created.
+  </Step>
+  <Step title="Profile">
+    Subsequent `/learner/user/*` calls hit UserOrg for the profile.
+  </Step>
+</Steps>
+
+## Start the whole auth set
+
+```bash
+docker start kc_postgres kc_local \
+             sunbird-local-cassandra-1 sunbird-local-redis-1 sunbird-local-elasticsearch-1 \
+             lern-userorg
+```
+
+<Warning>
+  Keycloak (`kc_local`) and its DB (`kc_postgres`) are **not** in the `sunbird-local` compose
+  project — `docker compose up -d` won't start them. Start them explicitly. See
+  [Keycloak](/auth/keycloak).
+</Warning>

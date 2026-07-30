@@ -1,0 +1,61 @@
+---
+title: Architecture
+description: How the React client, Express proxy and Sunbird services fit together.
+---
+
+EvalZero replaces SunbirdEd-portal's Angular client with a React SPA and a thin Express proxy. The
+proxy holds the session, injects Sunbird headers, and forwards to each microservice.
+
+## Request flow
+
+```
+React client (Vite :5173)
+   │  /api, /auth, /content-storage
+   ▼
+Express proxy (:3010)
+   │  session (lms_sid) · buildSunbirdHeaders · requireAuth
+   ├──► Keycloak (:8080)        tokens
+   ├──► UserOrg / Lern (:9600)  user + org profiles
+   ├──► Knowlg content (:9099)  courses / content
+   ├──► inQuiry (:9010)         questions + question sets
+   └──► search-service (:9011)  hierarchy reads
+```
+
+## Client data flow
+
+<Steps>
+  <Step title="Services">
+    Pure async functions in `client/src/services/` call the Express proxy via `lib/api.ts`.
+  </Step>
+  <Step title="Hooks">
+    `client/src/hooks/` wrap services with TanStack Query (5 min stale, 1 retry).
+  </Step>
+  <Step title="Components">
+    Components consume hooks only. Client state (auth, UI) lives in Zustand stores.
+  </Step>
+</Steps>
+
+## Two operating modes
+
+<CardGroup cols={2}>
+  <Card title="Mock mode" icon="flask">
+    `USE_MOCK=true`, `MOCK_AUTH=true`. All data from `server/src/mock/`. Any login works. No
+    external services needed.
+  </Card>
+  <Card title="Real mode" icon="plug">
+    `USE_MOCK=false`. Proxies to Knowlg, UserOrg and inQuiry with Keycloak auth. This is how the
+    dev box runs.
+  </Card>
+</CardGroup>
+
+## Response envelope
+
+Every Sunbird response wraps data in `{ result: { response | content | courses } }`. The client's
+`lib/api.ts` has `unwrapSunbirdResult()` to extract the payload; domain mappers live in
+`client/src/types/index.ts`.
+
+## Secure assessment grading
+
+Correct answers never reach the browser. `/questionset/play/:id` strips `responseDeclaration` and
+answers; `/questionset/submit/:id` fetches full questions server-to-server and grades on the
+server. See [inQuiry → Scoring](/inquiry/scoring).

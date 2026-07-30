@@ -1,0 +1,47 @@
+---
+title: Auth — Keycloak
+description: Token issuance, and why Keycloak starts separately from the compose stack.
+---
+
+Keycloak issues the JWTs EvalZero logs in with. It reads its realm/user/client config from its own
+Postgres.
+
+<CardGroup cols={2}>
+  <Card title="Container" icon="box">`kc_local` (+ `kc_postgres`)</Card>
+  <Card title="Port" icon="ethernet">`:8080`</Card>
+</CardGroup>
+
+## Config (`.env`)
+
+```bash
+KEYCLOAK_URL=http://localhost:8080/auth
+KEYCLOAK_REALM=sunbird
+KEYCLOAK_CLIENT_ID=lms          # confidential client, direct access grants
+KEYCLOAK_CLIENT_SECRET=…
+KEYCLOAK_FLOW=direct_grant      # direct_grant | oidc
+```
+
+Login: `POST /auth/login` → Keycloak token endpoint → JWT decode → session (`lms_sid`).
+
+## Why it needs a separate `docker start`
+
+<Warning>
+  `docker compose up -d` in `sunbird-local` only starts services **defined in that compose file**
+  — Cassandra, Neo4j, Redis, Elasticsearch, Postgres, MinIO, Zookeeper, Kafka. There is no
+  Keycloak service in it, so compose can't start `kc_local` or `kc_postgres`. Start them yourself.
+</Warning>
+
+There are **two** Postgres instances — don't confuse them:
+
+| Container | Port | Belongs to | Holds |
+| --- | --- | --- | --- |
+| `sunbird-local-postgres-1` | `5433` | sunbird-local compose | Sunbird app data |
+| `kc_postgres` | `5432` (internal) | Keycloak (standalone) | Keycloak realms / users / clients |
+
+So even though compose *does* start a Postgres, it is not Keycloak's. No `kc_postgres`, no
+Keycloak; no Keycloak, no login.
+
+<Note>
+  Containers don't auto-start on boot unless given a restart policy. To avoid the manual step:
+  `docker update --restart unless-stopped kc_postgres kc_local`.
+</Note>

@@ -1,0 +1,66 @@
+---
+title: LMS App — Configuration
+description: The .env variables that drive EvalZero in real mode.
+---
+
+All config is validated by Zod in `server/src/config.ts`. Copy `.env.example` to `.env`; defaults
+work for mock mode. Below are the real-mode values on the dev box.
+
+## Core
+
+<ParamField path="PORT" default="3010">
+  Express server port. This checkout uses `3010` (the `-lms` checkout uses `3002`).
+</ParamField>
+<ParamField path="USE_MOCK" default="false">
+  `false` = proxy to real Sunbird services. `true` = serve `server/src/mock/`.
+</ParamField>
+<ParamField path="MOCK_AUTH" default="false">
+  `false` = real Keycloak login. `true` = accept any credentials.
+</ParamField>
+<ParamField path="USE_MOCK_USERORG" default="false">
+  Falls back to mock user/org data when UserOrg is unreachable.
+</ParamField>
+<ParamField path="SESSION_SECRET" required>
+  Signs the `lms_sid` session cookie.
+</ParamField>
+
+## Keycloak (auth)
+
+<ParamField path="KEYCLOAK_URL" default="http://localhost:8080/auth" />
+<ParamField path="KEYCLOAK_REALM" default="sunbird" />
+<ParamField path="KEYCLOAK_CLIENT_ID" default="lms" />
+<ParamField path="KEYCLOAK_CLIENT_SECRET" required />
+<ParamField path="KEYCLOAK_FLOW" default="direct_grant">
+  `direct_grant` (username/password) or `oidc` (redirect).
+</ParamField>
+
+## Sunbird services
+
+<ParamField path="KNOWLG_BASE" default="http://localhost:9099">
+  Knowlg content service (note `:9099`, not `:9000`).
+</ParamField>
+<ParamField path="USERORG_BASE" default="http://localhost:9600" />
+<ParamField path="INQUIRY_BASE" default="http://localhost:9010">
+  inQuiry assessment-service → `config.services.inquiry`.
+</ParamField>
+<ParamField path="SUNBIRD_CHANNEL_ID" default="org-001">
+  Must match a real `sunbird.organisation.id`.
+</ParamField>
+
+## RC — credentials (optional)
+
+<ParamField path="RC_BASE" default="http://localhost:18091">Registry core.</ParamField>
+<ParamField path="RC_CRED_BASE" default="http://localhost:13000">Credentials service.</ParamField>
+<ParamField path="RC_SCHEMA_BASE" default="http://localhost:3333">Credential-schema service.</ParamField>
+<ParamField path="RC_ISSUE_ENABLED" default="true">Gates certificate issuance.</ParamField>
+
+## Email (optional)
+
+<ParamField path="LISTMONK_URL" default="http://localhost:9000" />
+<ParamField path="LISTMONK_USER" />
+<ParamField path="LISTMONK_TOKEN" />
+
+<Note>
+  Vite dev server proxies `/api`, `/auth` and `/content-storage` to the Express server. When the
+  server isn't on the default `:3002`, set `VITE_API_TARGET` accordingly.
+</Note>

@@ -1,0 +1,40 @@
+---
+title: Email — Overview
+description: Transactional email via listmonk — password resets, score-updated notifications.
+---
+
+EvalZero sends transactional email through **listmonk**. It's optional — login and every core flow
+work without it; sends degrade to a logged warning when unconfigured.
+
+<CardGroup cols={2}>
+  <Card title="Container" icon="box">`sahyogi_listmonk_app` (+ `listmonk_db`)</Card>
+  <Card title="Ports" icon="ethernet">app `:9000` · db `:5437`</Card>
+</CardGroup>
+
+## How it works
+
+EvalZero owns the template designs (`server/src/lib/email-templates.ts`) and syncs them into
+listmonk on startup. At send time the app resolves a template name → listmonk id and POSTs
+`/api/tx`; listmonk delivers via its stored SMTP config.
+
+| Template | Sent when |
+| --- | --- |
+| `evalzero-password-reset` | User requests a password reset |
+| `evalzero-welcome` / `evalzero-bulk-welcome` | Account created |
+| `evalzero-role-assigned` | Roles granted |
+| `evalzero-batch-invite` | Invited to a course batch |
+| `evalzero-score-updated` | An answer-key correction re-evaluated their attempt |
+
+## Config (`.env`)
+
+```bash
+LISTMONK_URL=http://localhost:9000
+LISTMONK_USER=spn-email
+LISTMONK_TOKEN=…
+```
+
+<Info>
+  Sends never throw on delivery errors — if listmonk is down or a template isn't synced, the call
+  returns `{ ok: false, reason }` and logs a warning. See the re-evaluation flow in
+  [inQuiry → Scoring](/inquiry/scoring).
+</Info>

@@ -1,0 +1,31 @@
+---
+title: RC — Startup
+description: Bring up the Sunbird RC credentialing stack (only when issuing certificates).
+---
+
+<Info>Folder: **`/home/sdas/evalzero/evalzero-sunbird-rc`** · Optional stack</Info>
+
+RC is only needed when EvalZero issues or verifies certificates. Start the whole compose stack:
+
+```bash
+cd /home/sdas/evalzero/evalzero-sunbird-rc
+docker compose up -d
+```
+
+## Verify
+
+```bash
+docker ps | grep evalzero-sunbird-rc     # registry / credential / schema up?
+curl -s localhost:18091/health | jq       # registry
+curl -s localhost:13000/health | jq       # credentials
+```
+
+<Note>
+  RC brings its own Keycloak, Postgres, Elasticsearch, Redis, Kafka and Zookeeper — it does **not**
+  reuse the `sunbird-local` infra. Expect a heavier startup than a single `docker start`.
+</Note>
+
+<Warning>
+  If certificate issuance is off (`RC_ISSUE_ENABLED=false`) you can leave RC stopped entirely — the
+  LMS, assessments and auth all work without it.
+</Warning>

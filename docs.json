@@ -1,0 +1,97 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "EvalZero Docs",
+  "theme": "mint",
+  "logo": {
+    "light": "/favicon.svg",
+    "dark": "/favicon.svg",
+    "href": "/index"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#12894e",
+    "light": "#3ddc84",
+    "dark": "#0f6b3d"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Home",
+        "groups": [
+          {
+            "group": " ",
+            "pages": ["index"]
+          }
+        ]
+      },
+      {
+        "tab": "Guide",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "guide/quickstart",
+              "guide/service-map",
+              "guide/ports",
+              "guide/architecture"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Services",
+        "groups": [
+          {
+            "group": "LMS App",
+            "pages": [
+              "lms/overview",
+              "lms/startup",
+              "lms/configuration",
+              "lms/troubleshooting"
+            ]
+          },
+          {
+            "group": "inQuiry — Assessment",
+            "pages": [
+              "inquiry/overview",
+              "inquiry/startup",
+              "inquiry/dependencies",
+              "inquiry/scoring"
+            ]
+          },
+          {
+            "group": "Auth",
+            "pages": [
+              "auth/overview",
+              "auth/startup",
+              "auth/keycloak",
+              "auth/userorg"
+            ]
+          },
+          {
+            "group": "Knowlg — Content",
+            "pages": ["knowlg/overview", "knowlg/startup"]
+          },
+          {
+            "group": "RC — Credentials",
+            "pages": ["rc/overview", "rc/startup"]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": ["infra/overview", "infra/startup"]
+          },
+          {
+            "group": "Email",
+            "pages": ["email/overview", "email/startup"]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": []
+    }
+  },
+  "footerSocials": {
+    "github": "https://github.com/evalzero"
+  }
+}

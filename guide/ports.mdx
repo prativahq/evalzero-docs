@@ -1,0 +1,36 @@
+---
+title: Port reference
+description: Every service and the exposed host port it answers on.
+---
+
+Every service and the exposed host port it answers on. **net** = network-internal only (no host
+mapping).
+
+| Port | Service | Layer |
+| --- | --- | --- |
+| `3010` | LMS Express server (this checkout) | App |
+| `5173 / 5174` | Vite dev client | App |
+| `8080` | Keycloak | Auth |
+| `9600` | UserOrg (Lern) | Auth |
+| `9099` | Knowlg content | Content |
+| `9010` | inQuiry assessment-service | inQuiry |
+| `9011` | search-service | inQuiry |
+| `9042` | Cassandra | Infra |
+| `7687 / 7474` | Neo4j (bolt / browser) | Infra |
+| `6380` | Redis | Infra |
+| `9200` | Elasticsearch | Infra |
+| `5433` | PostgreSQL | Infra |
+| `9001 / 9091` | MinIO (API / console) | Infra |
+| `2181` | Zookeeper | Infra |
+| `29092` | Kafka (net, usually stopped) | Infra |
+| `8200` | RC Vault | RC |
+| `18091` | RC registry | RC |
+| `13000` | RC credentials | RC |
+| `3333` | RC credential-schema | RC |
+| `9000` | listmonk (email) | Email |
+| `5437` | listmonk DB | Email |
+
+<Info>
+  Two Postgres instances: `sunbird-local-postgres-1` on **`5433`** (Sunbird app data) and
+  `kc_postgres` on **`5432`** internal (Keycloak's own store). They are not the same database.
+</Info>

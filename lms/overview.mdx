@@ -1,0 +1,61 @@
+---
+title: LMS App — Overview
+description: The EvalZero React client + Express proxy — the app you run.
+---
+
+The EvalZero LMS is a **React 19 SPA (Vite, TypeScript, Tailwind)** served alongside an **Express
+proxy** that talks to the Sunbird microservices. It's the app you run; every other service is a
+dependency.
+
+<CardGroup cols={2}>
+  <Card title="Folder" icon="folder">
+    `/home/sdas/evalzero/evalzero-sunbird-lms-jb`
+  </Card>
+  <Card title="Ports" icon="ethernet">
+    Server `:3010` · Vite client `:5173`
+  </Card>
+  <Card title="Run" icon="play">
+    `npm run dev`
+  </Card>
+  <Card title="Mode" icon="plug">
+    Real mode (against `sunbird-local`)
+  </Card>
+</CardGroup>
+
+## Monorepo layout
+
+| Path | What |
+| --- | --- |
+| `client/` | React 19 SPA (Vite, Tailwind) |
+| `server/` | Express proxy, auth, SCORM + content serving |
+| `scripts/` | Neo4j seed + maintenance scripts |
+
+## Middleware chain
+
+The Express server sits between the React client and Sunbird:
+
+<Steps>
+  <Step title="express-session">
+    Cookie-based session (`lms_sid`).
+  </Step>
+  <Step title="requireAuth">
+    Validates the session, auto-refreshes tokens (`middleware/auth.guard.ts`).
+  </Step>
+  <Step title="buildSunbirdHeaders">
+    Injects `x-authenticated-user-token`, `X-Channel-Id`, `Authorization`.
+  </Step>
+  <Step title="Route proxies">
+    Forward to Knowlg, UserOrg, inQuiry via `http-proxy-middleware`.
+  </Step>
+</Steps>
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Start it" icon="rocket" href="/lms/startup">
+    Install and run the dev servers.
+  </Card>
+  <Card title="Configuration" icon="gear" href="/lms/configuration">
+    The `.env` variables that drive real mode.
+  </Card>
+</CardGroup>

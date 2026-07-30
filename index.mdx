@@ -1,0 +1,54 @@
+---
+title: EvalZero LMS
+description: A React + Express LMS on the Sunbird microservice stack — one docs home for every service.
+---
+
+EvalZero LMS is a **React 19 + Vite** frontend with an **Express proxy** server that replaces the
+Angular client in SunbirdEd-portal. It runs against Sunbird's microservices (Knowlg, UserOrg,
+inQuiry) or fully offline with mock data.
+
+These docs are organised **one folder per service** — each holds that service's overview, its
+startup guide, and everything you need to run it.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/guide/quickstart">
+    Bring up EvalZero and its backing Sunbird services in a few commands.
+  </Card>
+  <Card title="Service & folder map" icon="map" href="/guide/service-map">
+    Every service — its folder, start command and exposed port.
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/guide/architecture">
+    How the React client, Express proxy and Sunbird services fit together.
+  </Card>
+  <Card title="Port reference" icon="ethernet" href="/guide/ports">
+    Every service and the host port it answers on.
+  </Card>
+</CardGroup>
+
+## Services
+
+<CardGroup cols={2}>
+  <Card title="LMS App" icon="browser" href="/lms/overview">
+    The EvalZero React client + Express proxy — the app you run. Port `:3010`.
+  </Card>
+  <Card title="inQuiry — Assessment" icon="clipboard-question" href="/inquiry/overview">
+    Question &amp; QuestionSet CRUD, secure grading, weighted scoring. Port `:9010`.
+  </Card>
+  <Card title="Auth — Keycloak + UserOrg" icon="key" href="/auth/overview">
+    Token issuance and user/org profiles. Ports `:8080` / `:9600`.
+  </Card>
+  <Card title="Knowlg — Content" icon="folder-tree" href="/knowlg/overview">
+    Content read / create / upload. Port `:9099`.
+  </Card>
+  <Card title="RC — Credentials" icon="certificate" href="/rc/overview">
+    Verifiable credentials behind certificates. Optional. Ports `:18091` / `:13000`.
+  </Card>
+  <Card title="Infrastructure" icon="database" href="/infra/overview">
+    Cassandra, Neo4j, Redis, Elasticsearch, MinIO, Postgres, Kafka.
+  </Card>
+</CardGroup>
+
+<Note>
+  Base path for every folder on the dev box is **`/home/sdas/evalzero`**. The LMS app lives in
+  `evalzero-sunbird-lms-jb` and runs in **real mode** against the shared `sunbird-local` stack.
+</Note>

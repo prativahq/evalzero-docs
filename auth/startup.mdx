@@ -1,0 +1,39 @@
+---
+title: Auth — Startup
+description: Start Keycloak and UserOrg and verify login works.
+---
+
+## Start
+
+```bash
+docker start kc_postgres kc_local \
+             sunbird-local-cassandra-1 sunbird-local-redis-1 sunbird-local-elasticsearch-1 \
+             lern-userorg
+```
+
+## Verify
+
+<CodeGroup>
+```bash Keycloak
+curl -s localhost:8080/auth/realms/sunbird/.well-known/openid-configuration | jq .issuer
+```
+```bash UserOrg
+curl -s localhost:9600/health | jq
+```
+</CodeGroup>
+
+## Dependency matrix
+
+| Dependency | Container | For |
+| --- | --- | --- |
+| Keycloak | `kc_local` | Token issuance |
+| Postgres | `kc_postgres` | Keycloak's own datastore (`:5432` internal) |
+| UserOrg | `lern-userorg` | Profile / user / org reads |
+| Cassandra | `sunbird-local-cassandra-1` | `sunbird` keyspace: `user`, `user_roles`, `user_organisation`, `system_settings` |
+| Redis | `sunbird-local-redis-1` | UserOrg cache |
+| Elasticsearch | `sunbird-local-elasticsearch-1` | User search / org lookups |
+
+<Tip>
+  Make them survive a reboot:
+  `docker update --restart unless-stopped kc_postgres kc_local lern-userorg`
+</Tip>

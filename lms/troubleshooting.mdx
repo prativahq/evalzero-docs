@@ -1,0 +1,42 @@
+---
+title: LMS App — Troubleshooting
+description: Common failures running EvalZero and how to fix them.
+---
+
+<AccordionGroup>
+  <Accordion title="Dev server exits immediately / EBADF: bad file descriptor">
+    `npm run dev -w server` uses `tsx watch`, which reads stdin. Started detached with `nohup … &`
+    it crashes with `EBADF`. Run it in a real terminal, redirect stdin with `< /dev/null`, or use
+    tmux.
+  </Accordion>
+
+  <Accordion title="Login fails / 401 from Keycloak">
+    Keycloak or its DB isn't up — they are **not** part of `sunbird-local` compose. Start them:
+    `docker start kc_postgres kc_local`. Confirm realm `sunbird` and client `lms` exist. See
+    [Auth → Keycloak](/auth/keycloak).
+  </Accordion>
+
+  <Accordion title="Profile page 500 / user reads fail">
+    UserOrg or its Cassandra schema is the culprit. The `sunbird.user` table must carry UserOrg's
+    columns (`flagsvalue`, `channel`, `maskedemail`, `maskedphone`, `alltncaccepted`), and the
+    container needs `sunbird_encryption=OFF` (or AES-encrypted seed data). The proxy falls back to
+    mock data on outage — toggle with `USE_MOCK_USERORG`. See [Auth → UserOrg](/auth/userorg).
+  </Accordion>
+
+  <Accordion title="Question set won't open / editor stuck loading">
+    `search-service` (`:9011`) must be up — the editor and player need
+    `questionset/v4/hierarchy/:id?mode=edit`, which reads through composite search. Also confirm
+    `assessment-service` (`:9010`) is healthy. See [inQuiry → Dependencies](/inquiry/dependencies).
+  </Accordion>
+
+  <Accordion title="Course page 500 / server exits on open">
+    A missing Cassandra secondary index throws "use ALLOW FILTERING", which surfaces as an
+    unhandled rejection and can exit the process. Recreate the index (e.g.
+    `inx_cou_bat_courseid` on `course_batch`).
+  </Accordion>
+
+  <Accordion title="Vite client can't reach the API">
+    The Vite proxy defaults to `:3002`. This checkout's server is on `:3010` — set
+    `VITE_API_TARGET=http://localhost:3010` when running the client standalone.
+  </Accordion>
+</AccordionGroup>

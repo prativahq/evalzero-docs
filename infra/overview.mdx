@@ -1,0 +1,41 @@
+---
+title: Infrastructure — Overview
+description: The sunbird-local database, storage and messaging stack every service shares.
+---
+
+Every EvalZero service shares one **`sunbird-local`** infra stack — a single `docker-compose`
+project of databases, object storage and messaging.
+
+<CardGroup cols={2}>
+  <Card title="Folder" icon="folder">`/home/sdas/evalzero/sunbird-local`</Card>
+  <Card title="Start" icon="play">`docker compose up -d`</Card>
+</CardGroup>
+
+## Services & ports
+
+| Service | Container | Host port | Role |
+| --- | --- | --- | --- |
+| Cassandra | `sunbird-local-cassandra-1` | `9042` | Metadata + external props |
+| Neo4j | `sunbird-local-neo4j-1` | `7687` · `7474` | Graph (bolt · browser) |
+| Redis | `sunbird-local-redis-1` | `6380` | Cache |
+| Elasticsearch | `sunbird-local-elasticsearch-1` | `9200` | Search index |
+| PostgreSQL | `sunbird-local-postgres-1` | `5433` | Relational store |
+| MinIO | `sunbird-local-minio-1` | `9001` · `9091` | Object storage (API · console) |
+| Zookeeper | `sunbird-local-zookeeper-1` | `2181` | Kafka coordination |
+| Kafka | `sunbird-local-kafka-1` | `29092` | Events (internal) |
+
+<Note>
+  Kafka is only needed by the async publish pipeline (Flink) and is usually **stopped**. Core
+  authoring, playing and grading run without it.
+</Note>
+
+<Warning>
+  This Postgres (`sunbird-local-postgres-1`, `:5433`) is **not** Keycloak's database. Keycloak uses
+  a separate `kc_postgres` container. See [Auth → Keycloak](/auth/keycloak).
+</Warning>
+
+<Info>
+  Never run `nodetool resetlocalschema` on this single-node Cassandra — it truncates `system_schema`
+  with no peer to resync from and wipes every keyspace/table *definition* (data on disk survives,
+  but recovery is manual).
+</Info>

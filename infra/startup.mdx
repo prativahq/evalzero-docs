@@ -1,0 +1,43 @@
+---
+title: Infrastructure — Startup
+description: Bring up the shared sunbird-local database and storage stack.
+---
+
+<Info>Folder: **`/home/sdas/evalzero/sunbird-local`**</Info>
+
+## Start everything
+
+```bash
+cd /home/sdas/evalzero/sunbird-local
+docker compose up -d
+```
+
+## Start a subset
+
+Most work only needs a few stores. For example, the [inQuiry](/inquiry/dependencies) set:
+
+```bash
+docker start sunbird-local-cassandra-1 sunbird-local-neo4j-1 sunbird-local-redis-1
+```
+
+## Verify
+
+<CodeGroup>
+```bash Cassandra
+docker exec sunbird-local-cassandra-1 cqlsh -e "SELECT release_version FROM system.local"
+```
+```bash Neo4j
+curl -s localhost:7474 | head -c 80
+```
+```bash Elasticsearch
+curl -s localhost:9200/_cluster/health | jq .status
+```
+```bash MinIO
+curl -s localhost:9001/minio/health/live -o /dev/null -w "%{http_code}\n"
+```
+</CodeGroup>
+
+<Tip>
+  Use the container's version-matched `cqlsh` (`docker exec sunbird-local-cassandra-1 cqlsh …`) —
+  a host `cqlsh` may not match the Cassandra 3.11 server for `DESCRIBE`.
+</Tip>

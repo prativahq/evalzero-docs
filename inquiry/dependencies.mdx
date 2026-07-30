@@ -1,0 +1,49 @@
+---
+title: inQuiry — Dependencies
+description: What assessment-service needs to author, play and grade — and what's optional.
+---
+
+`assessment-service` (`:9010`) reads and writes questions &amp; question sets. It needs only these
+four.
+
+| Dependency | Container | Status | Why |
+| --- | --- | --- | --- |
+| Cassandra | `sunbird-local-cassandra-1` | **required** | External props: `dev_question_store`, `dev_hierarchy_store`, `dev_category_store` |
+| Neo4j | `sunbird-local-neo4j-1` | **required** | Node metadata + graph (bolt `:7687`) |
+| Redis | `sunbird-local-redis-1` | **required** | Definition / category cache |
+| search-service | `search-service` (`:9011`) | **required** | `hierarchy/:id?mode=edit` — editor + player load |
+
+## Data prerequisites (fresh DB only)
+
+<Steps>
+  <Step title="Assessment columns">
+    Cassandra keyspaces carry the assessment columns: `outcomeDeclaration` on
+    `questionset_hierarchy`; `outcomeDeclaration` + `feedback` on `question_data`.
+  </Step>
+  <Step title="Category definitions">
+    Seed `dev_category_store.category_definition_data` — e.g.
+    `obj-cat:practice-question-set_questionset_all`, plus the question categories.
+  </Step>
+  <Step title="EvalZero tables">
+    The `evalzero` keyspace holds this app's tables — `questionset_attempts`, `course_questionset`,
+    `questionset_reeval_audit` — auto-created on first request (`ensureInquirySchema`).
+  </Step>
+</Steps>
+
+## Not required for authoring / playing / grading
+
+| Piece | Status | Only needed for |
+| --- | --- | --- |
+| Kafka + Flink knowlg-jobs | optional | `questionset/v4/publish` (Draft→Live). The LMS uses the secure `/play` + `/submit` flow, so publish is optional. |
+| `schema-http` | optional | Consumed by the Flink publish job, not the API. |
+
+<Info>
+  LMS wiring: `INQUIRY_BASE=http://localhost:9010` → `config.services.inquiry`; routes proxied in
+  `server/src/routes/inquiry.routes.ts`.
+</Info>
+
+<Warning>
+  The publish pipeline is Flink-based and currently blocked at the final Neo4j write inside the
+  Flink TaskManager. Because the LMS grades through `/play` + `/submit` (no published ECAR needed),
+  publish is not on the critical path.
+</Warning>

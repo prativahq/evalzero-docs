@@ -1,0 +1,89 @@
+---
+title: inQuiry — Scoring & Grading
+description: Weighted / partial MCQ scoring, subjective review, and automatic re-evaluation.
+---
+
+EvalZero grades assessments **server-side** so correct answers never reach the browser. This page
+covers the scoring model EvalZero layers on top of QuML.
+
+<Info>
+  `/questionset/play/:id` strips answers and exposes only `maxScore` per question.
+  `/questionset/submit/:id` fetches full questions server-to-server and computes the score.
+</Info>
+
+## Marks per question
+
+Every question carries a `maxScore` (default 1), stored top-level and in
+`responseDeclaration.response1`. Scoring behaviour is set by `scoringMode`.
+
+| Type | scoringMode | Award |
+| --- | --- | --- |
+| MCQ single / True-False | `binary` | Full marks if correct, else 0 |
+| MCQ multiple — all-or-nothing | `exact` | Full marks only if the exact set is chosen |
+| MCQ multiple — partial | `partial` | Per-option marks add up, clamped to `[0, maxScore]` |
+| Fill-in-the-Blank | `binary` | Full marks on case-insensitive match |
+| Subjective | `manual` | Graded by a human (see below) |
+
+### Partial credit example
+
+A multi-select worth 4, with option A = 1 and option B = 3:
+
+- pick A only → **1**
+- pick B only → **3**
+- pick both → **4**
+- pick both + a wrong option (0 marks) → **4** (clamped)
+
+Per-option marks are stored in `responseDeclaration.response1.mapping` and preserved verbatim by
+the assessment-service.
+
+## Subjective questions → held for review
+
+When a set contains **any** subjective question, the whole attempt is held as `pending_review` —
+**no score is shown** to the learner until a course creator grades it.
+
+<Steps>
+  <Step title="Learner submits">
+    Auto-graded MCQ/FTB marks are computed and stored; the attempt is `pending_review`. The learner
+    sees "Submitted for review", not a score.
+  </Step>
+  <Step title="Course creator grades">
+    In the Question Set studio's Attempts panel, a "Needs grading" queue shows each written answer,
+    the model answer, the rubric, a marks input, and an optional **remarks** field.
+  </Step>
+  <Step title="Final score">
+    `final = auto_score + Σ(subjective marks)`; status flips to `graded`; the learner's attempt now
+    shows the score and any remarks.
+  </Step>
+</Steps>
+
+## Automatic re-evaluation
+
+When an evaluator fixes a wrong answer key and republishes, **Re-evaluate** re-grades every stored
+attempt against the corrected key.
+
+<Steps>
+  <Step title="Re-grade auto questions">
+    Each attempt's stored raw answers are re-scored against the current key. Subjective manual marks
+    + remarks are preserved untouched.
+  </Step>
+  <Step title="Preserve the original">
+    The first submission score is kept once in `original_score` / `original_percent`; each event is
+    appended to `questionset_reeval_audit`.
+  </Step>
+  <Step title="Notify (optional)">
+    Learners whose score changed get a listmonk email ("Previous X% → Updated Y%").
+  </Step>
+</Steps>
+
+<Warning>
+  Re-evaluation maps attempts by **question identifier**. Editing a question in place works;
+  deleting and recreating it makes a new id, and old attempts can't be re-mapped.
+</Warning>
+
+## Storage
+
+| Table (`evalzero` keyspace) | Holds |
+| --- | --- |
+| `questionset_attempts` | Raw answers, auto/final score, status, per-question results, audit fields |
+| `questionset_reeval_audit` | One row per re-evaluation event per attempt |
+| `course_questionset` | Course ↔ question-set links |

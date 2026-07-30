@@ -1,0 +1,30 @@
+---
+title: Knowlg — Overview
+description: Sunbird Knowlg content service — content read, create and upload.
+---
+
+The **Knowlg content service** handles courses and content objects. EvalZero proxies content reads,
+creates and uploads to it.
+
+<CardGroup cols={2}>
+  <Card title="Folder" icon="folder">`/home/sdas/evalzero/knowlg`</Card>
+  <Card title="Container" icon="box">`knowlg-content`</Card>
+  <Card title="Port" icon="ethernet">`:9099` (host) → `9000` (container)</Card>
+  <Card title="Start" icon="play">`docker start knowlg-content`</Card>
+</CardGroup>
+
+<Warning>
+  Knowlg content runs on host **`:9099`**, not `:9000` — host `:9000` is taken by listmonk. The LMS
+  `.env` sets `KNOWLG_BASE=http://localhost:9099` (the `config.ts` default of `:9000` is
+  overridden).
+</Warning>
+
+## Backing stores
+
+Shares the `sunbird-local` infra: Neo4j (graph), Cassandra (external props), Redis (cache),
+Elasticsearch (search), MinIO (content storage).
+
+## EvalZero wiring
+
+The LMS proxies content + framework/channel calls to Knowlg; `/asset/*` also routes here. Course
+authoring, SCORM upload and content playback all flow through this service.

@@ -1,0 +1,38 @@
+---
+title: Service & folder map
+description: Every EvalZero service, the folder it lives in, and the command that starts it.
+---
+
+Every EvalZero service, the folder it lives in, and the one command that starts it. All paths are
+under **`/home/sdas/evalzero`**.
+
+| Service group | Folder | Start command | Ports |
+| --- | --- | --- | --- |
+| Infra (DBs, MinIO, ZK, Kafka) | `sunbird-local` | `docker compose up -d` | 9042 · 7687 · 6380 · 9200 · 5433 · 9001 · 2181 |
+| inQuiry — assessment + search + schema | `evalzero-sunbird-inquiry` | `docker start assessment-service search-service schema-http` | 9010 · 9011 |
+| Knowlg content | `knowlg` | `docker start knowlg-content` | 9099 |
+| UserOrg (Lern) | `lern` | `docker start lern-userorg` | 9600 |
+| Keycloak | *standalone container* | `docker start kc_postgres kc_local` | 8080 |
+| RC — registry & credentials | `evalzero-sunbird-rc` | `docker compose up -d` | 18091 · 13000 · 3333 · 8200 |
+| Email — listmonk | *shared container* | `docker start sahyogi_listmonk_app listmonk_db` | 9000 · 5437 |
+| **LMS app (this repo)** | `evalzero-sunbird-lms-jb` | `npm run dev` | 3010 · 5173 |
+
+<Note>
+  The microservices (assessment, search, knowlg, userorg, keycloak) are **already-built
+  long-running containers** — `docker start` is all you need day to day. Their rebuild recipes
+  (Docker Maven → Play dist) live in each service's folder.
+</Note>
+
+## Why some start with `docker start`, not compose
+
+Only two folders own a `docker-compose.yml` that EvalZero uses: `sunbird-local` (infra) and
+`evalzero-sunbird-rc` (credentials). Everything else — Keycloak, UserOrg, Knowlg, the inQuiry
+services — was built once into standalone containers, so `docker compose up` in `sunbird-local`
+never touches them. Start those with `docker start <name>`.
+
+<Warning>
+  Keycloak (`kc_local`) and its database (`kc_postgres`) are **not** part of the `sunbird-local`
+  compose project, so `docker compose up -d` won't start them. And `kc_postgres` (Keycloak's DB,
+  internal `:5432`) is a *different* Postgres from `sunbird-local-postgres-1` (`:5433`). See
+  [Auth → Keycloak](/auth/keycloak).
+</Warning>

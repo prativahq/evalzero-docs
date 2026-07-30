@@ -1,0 +1,65 @@
+---
+title: LMS App — Startup
+description: Install and run the EvalZero LMS dev servers.
+---
+
+<Info>Folder: **`/home/sdas/evalzero/evalzero-sunbird-lms-jb`** · Server **`:3010`**</Info>
+
+## Prerequisites
+
+The backing services should be up first — at minimum Keycloak + UserOrg (login) and the databases.
+See the [Quickstart](/guide/quickstart) cold-start steps, or start the auth set:
+
+```bash
+docker start kc_postgres kc_local \
+             sunbird-local-cassandra-1 sunbird-local-redis-1 sunbird-local-elasticsearch-1 \
+             lern-userorg
+```
+
+## Run
+
+<Steps>
+  <Step title="Install (first time only)">
+    ```bash
+    cd /home/sdas/evalzero/evalzero-sunbird-lms-jb
+    npm install
+    ```
+  </Step>
+  <Step title="Start both servers">
+    ```bash
+    npm run dev            # Express :3010 + Vite client, concurrently
+    ```
+  </Step>
+</Steps>
+
+## Workspace commands
+
+<CodeGroup>
+```bash Both
+npm run dev              # server + client (concurrently)
+```
+```bash Server only
+npm run dev -w server    # Express, tsx watch
+```
+```bash Client only
+npm run dev -w client    # Vite dev server
+```
+```bash Build / lint
+npm run build            # tsup server + vite client
+npm run lint             # type-check client (tsc --noEmit)
+```
+</CodeGroup>
+
+<Warning>
+  **Port band.** `.env` sets `PORT=3010` so this checkout coexists with an `-lms` checkout on
+  `:3002`. The Vite proxy target is env-driven — point it at this server:
+  ```bash
+  VITE_API_TARGET=http://localhost:3010 VITE_DEV_PORT=5174 npm run dev -w client
+  ```
+</Warning>
+
+<Note>
+  `npm run dev -w server` uses `tsx watch`, which reads stdin. Running it detached with
+  `nohup … &` fails with `EBADF: bad file descriptor`. Run it in a real terminal (or `< /dev/null`,
+  or tmux).
+</Note>

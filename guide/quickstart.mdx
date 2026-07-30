@@ -1,0 +1,74 @@
+---
+title: Quickstart
+description: Run EvalZero LMS and the Sunbird services it depends on, in three layers.
+---
+
+EvalZero LMS is the app you run — the Sunbird services are its backing stack. If those are
+already up, one command starts EvalZero.
+
+<Info>
+  All paths are under **`/home/sdas/evalzero`**. The LMS server runs on **`:3010`**.
+</Info>
+
+## Already running? Run EvalZero
+
+<CodeGroup>
+```bash EvalZero
+cd /home/sdas/evalzero/evalzero-sunbird-lms-jb
+npm run dev            # EvalZero → server :3010 + Vite client
+```
+</CodeGroup>
+
+Cold machine? Bring up the three backing layers first, then run EvalZero.
+
+## Cold start — three layers
+
+<Steps>
+  <Step title="Infra stack — databases, storage & Kafka">
+    ```bash
+    cd /home/sdas/evalzero/sunbird-local
+    docker compose up -d
+    ```
+    Brings up Cassandra, Neo4j, Redis, Elasticsearch, PostgreSQL, MinIO, Zookeeper and Kafka.
+    See [Infrastructure](/infra/overview) for the full port map.
+  </Step>
+
+  <Step title="Sunbird microservices — already built, just start them">
+    ```bash
+    docker start \
+      kc_postgres kc_local \
+      lern-userorg \
+      knowlg-content \
+      assessment-service search-service schema-http
+    ```
+    These are long-running containers — `docker start` is all you need day to day.
+  </Step>
+
+  <Step title="Run EvalZero (this checkout)">
+    ```bash
+    cd /home/sdas/evalzero/evalzero-sunbird-lms-jb
+    npm install            # first time only
+    npm run dev            # server :3010 + Vite client
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  **Port band.** This checkout's server runs on `:3010` (see `.env` `PORT=3010`) so an `-lms`
+  checkout on `:3002` can run alongside. Point Vite at this server:
+  `VITE_API_TARGET=http://localhost:3010 VITE_DEV_PORT=5174 npm run dev -w client`.
+</Warning>
+
+## Health checks
+
+```bash
+curl -s localhost:9010/health | jq   # assessment (cassandra+neo4j+redis)
+curl -s localhost:9011/health | jq   # search (elasticsearch)
+curl -s localhost:9099/health | jq   # knowlg content
+curl -s localhost:9600/health | jq   # userorg
+```
+
+<Tip>
+  Want the microservices to survive a reboot?
+  `docker update --restart unless-stopped kc_postgres kc_local lern-userorg knowlg-content assessment-service search-service`
+</Tip>
