@@ -20,6 +20,7 @@ curl -s localhost:9099/health | jq   # redis + graph + cassandra
 ```
 
 <Note>
-  Knowlg is an already-built container — `docker start` is all you need. It shares every infra store
-  with inQuiry, so if the databases are up for the assessment service, Knowlg needs nothing extra.
+  On this dev box Knowlg is an already-built container — `docker start` is all you need (a fresh
+  machine must create it first). It shares every infra store with inQuiry, so if the databases are
+  up for the assessment service, Knowlg needs nothing extra.
 </Note>

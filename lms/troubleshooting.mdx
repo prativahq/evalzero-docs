@@ -36,7 +36,8 @@ description: Common failures running EvalZero and how to fix them.
   </Accordion>
 
   <Accordion title="Vite client can't reach the API">
-    The Vite proxy defaults to `:3002`. This checkout's server is on `:3010` — set
-    `VITE_API_TARGET=http://localhost:3010` when running the client standalone.
+    The Vite proxy targets `:3002` by default, which matches this server — so the client works out
+    of the box. Only override `VITE_API_TARGET` if you moved the server to a non-default `PORT`
+    (e.g. a second checkout).
   </Accordion>
 </AccordionGroup>

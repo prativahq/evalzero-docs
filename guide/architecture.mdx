@@ -12,7 +12,7 @@ proxy holds the session, injects Sunbird headers, and forwards to each microserv
 React client (Vite :5173)
    │  /api, /auth, /content-storage
    ▼
-Express proxy (:3010)
+Express proxy (:3002)
    │  session (lms_sid) · buildSunbirdHeaders · requireAuth
    ├──► Keycloak (:8080)        tokens
    ├──► UserOrg / Lern (:9600)  user + org profiles

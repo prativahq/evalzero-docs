@@ -8,8 +8,9 @@ work for mock mode. Below are the real-mode values on the dev box.
 
 ## Core
 
-<ParamField path="PORT" default="3010">
-  Express server port. This checkout uses `3010` (the `-lms` checkout uses `3002`).
+<ParamField path="PORT" default="3002">
+  Express server port. `3002` is also the Vite dev proxy's default target, so the client needs no
+  override. A second checkout should use a different port.
 </ParamField>
 <ParamField path="USE_MOCK" default="false">
   `false` = proxy to real Sunbird services. `true` = serve `server/src/mock/`.

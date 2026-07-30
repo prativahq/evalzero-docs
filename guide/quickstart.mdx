@@ -7,7 +7,7 @@ EvalZero LMS is the app you run — the Sunbird services are its backing stack. 
 already up, one command starts EvalZero.
 
 <Info>
-  All paths are under **`/home/sdas/evalzero`**. The LMS server runs on **`:3010`**.
+  All paths are under **`/home/sdas/evalzero`**. The LMS server runs on **`:3002`**.
 </Info>
 
 ## Already running? Run EvalZero
@@ -15,7 +15,7 @@ already up, one command starts EvalZero.
 <CodeGroup>
 ```bash EvalZero
 cd /home/sdas/evalzero/evalzero-sunbird-lms
-npm run dev            # EvalZero → server :3010 + Vite client
+npm run dev            # EvalZero → server :3002 + Vite client
 ```
 </CodeGroup>
 
@@ -33,7 +33,7 @@ Cold machine? Bring up the three backing layers first, then run EvalZero.
     See [Infrastructure](/infra/overview) for the full port map.
   </Step>
 
-  <Step title="Sunbird microservices — already built, just start them">
+  <Step title="Sunbird microservices — start the existing containers">
     ```bash
     docker start \
       kc_postgres kc_local \
@@ -41,23 +41,31 @@ Cold machine? Bring up the three backing layers first, then run EvalZero.
       knowlg-content \
       assessment-service search-service schema-http
     ```
-    These are long-running containers — `docker start` is all you need day to day.
+    On **this dev box** these containers were already built, so `docker start` is all you need.
+
+    <Warning>
+      `docker start` only starts an **existing** container. On a **fresh machine** these don't
+      exist yet — `docker start` returns *No such container*. You must **create** them first (build
+      → `docker run`, or `docker compose` for infra + RC), and only then does `docker start` apply.
+      Rebuild recipes live in each service's folder — see
+      [inQuiry → Startup](/inquiry/startup) for the assessment/search build.
+    </Warning>
   </Step>
 
   <Step title="Run EvalZero (this checkout)">
     ```bash
     cd /home/sdas/evalzero/evalzero-sunbird-lms
     npm install            # first time only
-    npm run dev            # server :3010 + Vite client
+    npm run dev            # server :3002 + Vite client
     ```
   </Step>
 </Steps>
 
-<Warning>
-  **Port band.** This checkout's server runs on `:3010` (see `.env` `PORT=3010`) so an `-lms`
-  checkout on `:3002` can run alongside. Point Vite at this server:
-  `VITE_API_TARGET=http://localhost:3010 VITE_DEV_PORT=5174 npm run dev -w client`.
-</Warning>
+<Note>
+  The server runs on `:3002` — the Vite dev server's default proxy target — so `npm run dev` works
+  with no extra env. Running a **second** checkout alongside? Give it a different `PORT` and point
+  its client at it, e.g. `VITE_API_TARGET=http://localhost:3010 VITE_DEV_PORT=5174 npm run dev -w client`.
+</Note>
 
 ## Health checks
 

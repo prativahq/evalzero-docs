@@ -15,12 +15,14 @@ under **`/home/sdas/evalzero`**.
 | Keycloak | *standalone container* | `docker start kc_postgres kc_local` | 8080 |
 | RC — registry & credentials | `evalzero-sunbird-rc` | `docker compose up -d` | 18091 · 13000 · 3333 · 8200 |
 | Email — listmonk | *shared container* | `docker start sahyogi_listmonk_app listmonk_db` | 9000 · 5437 |
-| **LMS app (this repo)** | `evalzero-sunbird-lms` | `npm run dev` | 3010 · 5173 |
+| **LMS app (this repo)** | `evalzero-sunbird-lms` | `npm run dev` | 3002 · 5173 |
 
 <Note>
-  The microservices (assessment, search, knowlg, userorg, keycloak) are **already-built
-  long-running containers** — `docker start` is all you need day to day. Their rebuild recipes
-  (Docker Maven → Play dist) live in each service's folder.
+  On **this dev box** the microservices (assessment, search, knowlg, userorg, keycloak) are
+  **already-built long-running containers** — `docker start` is all you need day to day. On a
+  **fresh machine** they don't exist yet: you must build/create them first (Docker Maven → Play
+  dist, then `docker run`) — the recipes live in each service's folder — before `docker start`
+  applies.
 </Note>
 
 ## Why some start with `docker start`, not compose
