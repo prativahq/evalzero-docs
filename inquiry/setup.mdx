@@ -1,0 +1,237 @@
+---
+title: inQuiry — Fresh Machine Setup
+description: Build and run the assessment + search services from a git clone on a brand-new machine.
+---
+
+This is the **from-scratch** guide: clone → build → assemble runtime → configure → seed Cassandra →
+run. On a machine that already has the containers, use [Startup](/inquiry/startup) instead — that
+just does `docker start`.
+
+<Info>
+  Everything builds with **Docker Maven** (no host JDK/Maven needed) and runs as containers on the
+  shared `sunbird-local_default` network. Target folder: `~/evalzero/evalzero-sunbird-inquiry`.
+</Info>
+
+## Prerequisites
+
+<Steps>
+  <Step title="Docker + the infra stack">
+    Docker installed, and the `sunbird-local` infra up (Cassandra, Neo4j, Redis, Elasticsearch,
+    MinIO, Kafka). See [Infrastructure → Startup](/infra/startup).
+    ```bash
+    cd ~/evalzero/sunbird-local && docker compose up -d
+    docker network ls | grep sunbird-local_default   # the shared network must exist
+    ```
+  </Step>
+  <Step title="knowlg-core artifacts in ~/.m2">
+    The assessment build reuses Knowlg's `knowledge-platform` `_2.13` artifacts (graph-engine,
+    graph-core, cloud-store-sdk…). They must already be in your local Maven cache — build the
+    `knowlg` service first so `~/.m2/repository/org/sunbird/**` is populated.
+  </Step>
+</Steps>
+
+## 1 · Clone
+
+```bash
+cd ~/evalzero
+git clone https://github.com/prativahq/evalzero-sunbird-inquiry.git
+cd evalzero-sunbird-inquiry
+```
+
+## 2 · Build (Docker Maven)
+
+Compile and install all modules — no host JDK required. ~1 min with a warm `~/.m2`.
+
+```bash
+docker run --rm -v $PWD:/app -v $HOME/.m2:/root/.m2 -w /app \
+  --platform linux/amd64 maven:3.9-eclipse-temurin-11 \
+  mvn clean install -DskipTests -Dmaven.test.skip=true
+```
+
+## 3 · Package the runnable dist
+
+```bash
+docker run --rm -v $PWD:/app -v $HOME/.m2:/root/.m2 \
+  -w /app/assessment-api/assessment-service \
+  --platform linux/amd64 maven:3.9-eclipse-temurin-11 \
+  mvn play2:dist -Dplay2.fileWatchService=no -Dmaven.test.skip=true
+```
+
+Produces `assessment-api/assessment-service/target/assessment-service-1.0-SNAPSHOT-dist.zip` (~90 MB).
+
+<Warning>
+  The container runs as root, so `target/` ends up **root-owned** — you can't unzip it in place as
+  your user. Copy the zip out to a user-owned folder first (next step).
+</Warning>
+
+## 4 · Assemble the runtime layout
+
+Lay out a self-contained `assessment-runtime/` with the dist, config and schemas:
+
+```bash
+mkdir -p assessment-runtime
+sudo cp assessment-api/assessment-service/target/assessment-service-1.0-SNAPSHOT-dist.zip assessment-runtime/
+sudo chown $USER assessment-runtime/assessment-service-1.0-SNAPSHOT-dist.zip
+cd assessment-runtime
+unzip -q assessment-service-1.0-SNAPSHOT-dist.zip     # → assessment-service-1.0-SNAPSHOT/ (start + lib/)
+mkdir -p config schemas
+cp ../assessment-api/assessment-service/conf/application.conf config/
+cp ../assessment-api/assessment-service/conf/logback.xml      config/
+cp -r ../assessment-api/assessment-service/target/classes/schemas/* schemas/   # QuML schema definitions
+cd ..
+```
+
+The final tree:
+
+```
+assessment-runtime/
+├─ assessment-service-1.0-SNAPSHOT/   # start + lib/*.jar
+├─ config/   application.conf · logback.xml
+└─ schemas/  question · questionset · itemset · assessmentitem · objectcategorydefinition
+```
+
+## 5 · Configure `application.conf`
+
+Point the service at the `sunbird-local` containers. Edit `assessment-runtime/config/application.conf`:
+
+| Key | Value |
+| --- | --- |
+| `schema.base_path` | `"/app/schemas/"` |
+| `cassandra.lp.connection` | `"sunbird-local-cassandra-1:9042"` |
+| `cassandra.*.connection` (both blocks) | `"sunbird-local-cassandra-1:9042"` |
+| `redis.host` | `"sunbird-local-redis-1"` |
+| `route.*` (all bolt routes) | `"bolt://sunbird-local-neo4j-1:7687"` |
+| `composite.search.url` | `"http://search-service:9000/v3/search"` |
+| `kafka.urls` | `"sunbird-local-kafka-1:29092"` |
+
+<Note>
+  Assessment-service needs only **Cassandra + Neo4j + Redis** to boot; `composite.search.url` is
+  used for hierarchy reads, and `kafka.urls` only for (optional) publish + telemetry.
+</Note>
+
+## 6 · Prepare Cassandra
+
+The `dev_hierarchy_store` / `dev_question_store` keyspaces exist from Knowlg, but their tables lack
+the assessment columns. Apply the repo CQL, then add the missing columns.
+
+<Steps>
+  <Step title="Apply the base CQL (idempotent)">
+    ```bash
+    docker cp scripts/cassandra-db/cassandra.cql sunbird-local-cassandra-1:/tmp/cassandra.cql
+    docker exec sunbird-local-cassandra-1 cqlsh -f /tmp/cassandra.cql
+    ```
+  </Step>
+  <Step title="Add assessment columns">
+    ```sql
+    ALTER TABLE dev_hierarchy_store.questionset_hierarchy ADD outcomeDeclaration text;
+    ALTER TABLE dev_question_store.question_data ADD outcomeDeclaration text;
+    ALTER TABLE dev_question_store.question_data ADD feedback text;
+    ```
+    Run via `docker exec -it sunbird-local-cassandra-1 cqlsh`.
+  </Step>
+  <Step title="Seed category definitions">
+    The service reads category defs from `dev_category_store.category_definition_data`. Clone the
+    `_content_all` row into the question &amp; questionset categories — e.g.
+    `obj-cat:practice-question-set_questionset_all`, `obj-cat:course-assessment_questionset_all`,
+    and `multiple-choice-question` / `subjective-question` / `ftb-question` `_question_all`.
+    Without these, `create` returns `ResourceNotFoundException`.
+  </Step>
+</Steps>
+
+<Warning>
+  Use the container's version-matched `cqlsh` (`docker exec sunbird-local-cassandra-1 cqlsh …`). A
+  host `cqlsh` may not `DESCRIBE` against the Cassandra 3.11 server. **Never** run `nodetool
+  resetlocalschema` on this single node — it wipes every schema definition.
+</Warning>
+
+## 7 · Build & run search-service
+
+The editor/player need `questionset/v4/hierarchy/:id?mode=edit`, which calls composite search — so
+`search-service` must be running.
+
+<Steps>
+  <Step title="Build (from the knowlg knowledge-platform)">
+    Play-dist the `search-api/search-service` module the same way (Docker Maven → `play2:dist`),
+    then extract it to `search-runtime/`.
+  </Step>
+  <Step title="Configure search-runtime/config/application.conf">
+    ```properties
+    search.es_conn_info = "sunbird-local-elasticsearch-1:9200"
+    play.modules.enabled += modules.SearchModule    # REQUIRED or Guice fails to bind SearchActor
+    ```
+  </Step>
+  <Step title="Create the ES index">
+    Create the `compositesearch` index (per-type dynamic templates with `.raw` subfields,
+    ES-7.17-compatible). It starts empty — search *results* fill in only once the Flink indexer
+    runs, but hierarchy reads work immediately.
+  </Step>
+  <Step title="Run the container">
+    ```bash
+    docker run -d --name search-service --network sunbird-local_default -p 9011:9000 \
+      -v $PWD/search-runtime/search-service-1.0-SNAPSHOT:/app/dist:ro \
+      -v $PWD/search-runtime/config:/app/config:ro \
+      -w /app --platform linux/amd64 eclipse-temurin:17-jre \
+      sh /app/dist/start -Dhttp.port=9000 -Dpidfile.path=/dev/null \
+      -Dconfig.file=/app/config/application.conf -Dlogger.file=/app/config/logback.xml
+    ```
+  </Step>
+</Steps>
+
+## 8 · Run assessment-service
+
+Host **9010** → container **9000** (Knowlg content owns 9000):
+
+```bash
+docker run -d --name assessment-service --network sunbird-local_default -p 9010:9000 \
+  -v $PWD/assessment-runtime/assessment-service-1.0-SNAPSHOT:/app/dist:ro \
+  -v $PWD/assessment-runtime/config:/app/config:ro \
+  -v $PWD/assessment-runtime/schemas:/app/schemas:ro \
+  -w /app --platform linux/amd64 eclipse-temurin:17-jre \
+  sh /app/dist/start -Dhttp.port=9000 -Dpidfile.path=/dev/null \
+  -Dconfig.file=/app/config/application.conf -Dlogger.file=/app/config/logback.xml
+```
+
+## 9 · Verify
+
+```bash
+curl -s localhost:9010/health | jq   # cassandra + neo4j + redis → all healthy
+curl -s localhost:9011/health | jq   # elasticsearch → healthy
+
+# create → read a question
+curl -s -X POST localhost:9010/question/v4/create \
+  -H 'Content-Type: application/json' \
+  -d '{"request":{"question":{"code":"smoke-q-1","name":"Smoke","mimeType":"application/vnd.sunbird.question","primaryCategory":"Multiple Choice Question"}}}' | jq .result.identifier
+```
+
+A `do_…` identifier back means the full stack — build, config, Cassandra columns, category defs — is
+wired correctly. The LMS reaches it via `INQUIRY_BASE=http://localhost:9010`.
+
+## Optional · Flink publish pipeline
+
+Publish (`questionset/v4/publish`, Draft→Live) is **not required** — the LMS grades via `/play` +
+`/submit`. To run it anyway you need a Flink cluster plus the built job:
+
+<AccordionGroup>
+  <Accordion title="Cluster + job">
+    Run `flink:1.13.6-scala_2.12-java11` as `flink-jm` (host :18081 UI) + `flink-tm` on
+    `sunbird-local_default`. The fat jar `flink-runtime/questionset-publish-1.0.0.jar` (122 MB) is
+    submitted with `flink run`.
+  </Accordion>
+  <Accordion title="Submit">
+    ```bash
+    docker exec flink-jm flink run -d \
+      -c org.sunbird.job.questionset.task.QuestionSetPublishStreamTask \
+      /rt/questionset-publish-1.0.0.jar --config.file.path /rt/qs-publish-local.conf
+    ```
+    Config (`flink-runtime/qs-publish-local.conf`): Kafka on the **internal** listener
+    `sunbird-local-kafka-1:29092`, `schema.basePath=http://schema-http:8000`,
+    `cloud_storage_type="cephs3"` (MinIO). Also create the Kafka topics and the `schema-http`
+    container.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  The publish job is currently **blocked at the final Neo4j write** inside the Flink TaskManager
+  (`ServiceUnavailableException`), so publish stays Draft. This does not affect authoring, playing
+  or grading.
+</Warning>

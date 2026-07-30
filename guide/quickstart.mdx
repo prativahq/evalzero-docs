@@ -7,14 +7,14 @@ EvalZero LMS is the app you run — the Sunbird services are its backing stack. 
 already up, one command starts EvalZero.
 
 <Info>
-  All paths are under **`/home/sdas/evalzero`**. The LMS server runs on **`:3002`**.
+  All paths are under **`~/evalzero`**. The LMS server runs on **`:3002`**.
 </Info>
 
 ## Already running? Run EvalZero
 
 <CodeGroup>
 ```bash EvalZero
-cd /home/sdas/evalzero/evalzero-sunbird-lms
+cd ~/evalzero/evalzero-sunbird-lms
 npm run dev            # EvalZero → server :3002 + Vite client
 ```
 </CodeGroup>
@@ -26,7 +26,7 @@ Cold machine? Bring up the three backing layers first, then run EvalZero.
 <Steps>
   <Step title="Infra stack — databases, storage & Kafka">
     ```bash
-    cd /home/sdas/evalzero/sunbird-local
+    cd ~/evalzero/sunbird-local
     docker compose up -d
     ```
     Brings up Cassandra, Neo4j, Redis, Elasticsearch, PostgreSQL, MinIO, Zookeeper and Kafka.
@@ -54,7 +54,7 @@ Cold machine? Bring up the three backing layers first, then run EvalZero.
 
   <Step title="Run EvalZero (this checkout)">
     ```bash
-    cd /home/sdas/evalzero/evalzero-sunbird-lms
+    cd ~/evalzero/evalzero-sunbird-lms
     npm install            # first time only
     npm run dev            # server :3002 + Vite client
     ```

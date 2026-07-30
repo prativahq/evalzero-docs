@@ -3,7 +3,7 @@ title: inQuiry — Startup
 description: Start the assessment and search services and verify health.
 ---
 
-<Info>Folder: **`/home/sdas/evalzero/evalzero-sunbird-inquiry`** · Ports **9010 / 9011**</Info>
+<Info>Folder: **`~/evalzero/evalzero-sunbird-inquiry`** · Ports **9010 / 9011**</Info>
 
 ## Start the inQuiry set
 
@@ -32,18 +32,15 @@ A healthy `:9010` returns all three checks green. Then confirm a read path:
 curl -s localhost:9010/questionset/v4/read/do_test  # 404 for a missing id is expected
 ```
 
-## Rebuild (only if changed)
+## Building from scratch
 
-The container is a Play dist built with Docker Maven (no host JDK). From the repo root:
+If the containers don't exist yet (a fresh machine), this page's `docker start` won't work — you
+have to clone, build and assemble the runtime first.
 
-```bash
-docker run --rm -v $PWD:/app -v $HOME/.m2:/root/.m2 -w /app \
-  --platform linux/amd64 maven:3.9-eclipse-temurin-11 \
-  mvn clean install -DskipTests -Dmaven.test.skip=true
-```
-
-Then `play2:dist` the `assessment-service` module and re-run the container. The runtime layout
-(dist + config + schemas) lives under `assessment-runtime/` in the repo.
+<Card title="Fresh machine setup" icon="hammer" href="/inquiry/setup">
+  The full recipe: git clone → Docker Maven build → dist → runtime layout → Cassandra columns +
+  category seed → run assessment + search.
+</Card>
 
 <Warning>
   The service reads category definitions from `dev_category_store.category_definition_data`

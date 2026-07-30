@@ -9,7 +9,7 @@ dependency.
 
 <CardGroup cols={2}>
   <Card title="Folder" icon="folder">
-    `/home/sdas/evalzero/evalzero-sunbird-lms`
+    `~/evalzero/evalzero-sunbird-lms`
   </Card>
   <Card title="Ports" icon="ethernet">
     Server `:3002` · Vite client `:5173`
@@ -21,6 +21,24 @@ dependency.
     Real mode (against `sunbird-local`)
   </Card>
 </CardGroup>
+
+## Repository & run
+
+<CardGroup cols={2}>
+  <Card title="Repository" icon="github" href="https://github.com/prativahq/evalzero-sunbird-lms">
+    `prativahq/evalzero-sunbird-lms`
+  </Card>
+  <Card title="Make it live" icon="play">
+    `npm run dev` → `:3002`
+  </Card>
+</CardGroup>
+
+```bash
+git clone https://github.com/prativahq/evalzero-sunbird-lms.git
+cd evalzero-sunbird-lms
+npm install            # install
+npm run dev            # make it live → server :3002 + Vite client
+```
 
 ## Monorepo layout
 

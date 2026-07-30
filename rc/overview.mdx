@@ -8,11 +8,26 @@ certificates. It's a self-contained compose stack and is **optional** — EvalZe
 it.
 
 <CardGroup cols={2}>
-  <Card title="Folder" icon="folder">`/home/sdas/evalzero/evalzero-sunbird-rc`</Card>
+  <Card title="Folder" icon="folder">`~/evalzero/evalzero-sunbird-rc`</Card>
   <Card title="Start" icon="play">`docker compose up -d`</Card>
   <Card title="Gate" icon="toggle-on">`.env` `RC_ISSUE_ENABLED`</Card>
   <Card title="Status" icon="circle-pause">Mostly stopped by default</Card>
 </CardGroup>
+
+## Repository & run
+
+<Card title="Repository" icon="github" href="https://github.com/prativahq/evalzero-sunbird-rc">
+  `prativahq/evalzero-sunbird-rc`
+</Card>
+
+```bash
+git clone https://github.com/prativahq/evalzero-sunbird-rc.git   # install
+cd evalzero-sunbird-rc
+docker compose up -d                                             # make it live
+```
+
+RC is compose-based, so `docker compose up -d` **creates** its containers (registry, credential,
+schema, vault, its own Keycloak + stores) on first run — no separate build step.
 
 ## Services
 

@@ -7,7 +7,7 @@ The **Knowlg content service** handles courses and content objects. EvalZero pro
 creates and uploads to it.
 
 <CardGroup cols={2}>
-  <Card title="Folder" icon="folder">`/home/sdas/evalzero/knowlg`</Card>
+  <Card title="Folder" icon="folder">`~/evalzero/knowlg`</Card>
   <Card title="Container" icon="box">`knowlg-content`</Card>
   <Card title="Port" icon="ethernet">`:9099` (host) → `9000` (container)</Card>
   <Card title="Start" icon="play">`docker start knowlg-content`</Card>
@@ -18,6 +18,21 @@ creates and uploads to it.
   `.env` sets `KNOWLG_BASE=http://localhost:9099` (the `config.ts` default of `:9000` is
   overridden).
 </Warning>
+
+## Repository & run
+
+<Card title="Repository" icon="github" href="https://github.com/prativahq/evalzero-sunbird-knowlg-service">
+  `prativahq/evalzero-sunbird-knowlg-service`
+</Card>
+
+```bash
+git clone https://github.com/prativahq/evalzero-sunbird-knowlg-service.git knowlg   # install
+docker start knowlg-content                                                         # make it live
+```
+
+Knowlg is a Play/Scala service — on a fresh machine it's built once (Docker Maven → Play dist →
+`docker run`, the same pattern as [inQuiry setup](/inquiry/setup)); afterwards `docker start` is
+enough.
 
 ## Backing stores
 

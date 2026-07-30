@@ -5,7 +5,7 @@ Mintlify documentation for EvalZero LMS and its Sunbird services — one folder 
 ## Preview locally
 
 ```bash
-cd /home/sdas/evalzero/evalzero-docs
+cd ~/evalzero/evalzero-docs
 npm i -g mint      # or: npx mint@latest dev
 mint dev           # serves at http://localhost:3000
 ```

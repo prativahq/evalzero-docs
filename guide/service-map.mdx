@@ -1,36 +1,61 @@
 ---
 title: Service & folder map
-description: Every EvalZero service, the folder it lives in, and the command that starts it.
+description: Every EvalZero service — its repo, the command to install it, and the command to make it live.
 ---
 
-Every EvalZero service, the folder it lives in, and the one command that starts it. All paths are
-under **`/home/sdas/evalzero`**.
+Every EvalZero service: the GitHub repo to clone, the command that **installs/builds** it, and the
+command that makes it **live**. All repos are under [`github.com/prativahq`](https://github.com/prativahq).
 
-| Service group | Folder | Start command | Ports |
-| --- | --- | --- | --- |
-| Infra (DBs, MinIO, ZK, Kafka) | `sunbird-local` | `docker compose up -d` | 9042 · 7687 · 6380 · 9200 · 5433 · 9001 · 2181 |
-| inQuiry — assessment + search + schema | `evalzero-sunbird-inquiry` | `docker start assessment-service search-service schema-http` | 9010 · 9011 |
-| Knowlg content | `knowlg` | `docker start knowlg-content` | 9099 |
-| UserOrg (Lern) | `lern` | `docker start lern-userorg` | 9600 |
-| Keycloak | *standalone container* | `docker start kc_postgres kc_local` | 8080 |
-| RC — registry & credentials | `evalzero-sunbird-rc` | `docker compose up -d` | 18091 · 13000 · 3333 · 8200 |
-| Email — listmonk | *shared container* | `docker start sahyogi_listmonk_app listmonk_db` | 9000 · 5437 |
-| **LMS app (this repo)** | `evalzero-sunbird-lms` | `npm run dev` | 3002 · 5173 |
+## Repositories
+
+| Service | Repository | Folder |
+| --- | --- | --- |
+| LMS app | `prativahq/evalzero-sunbird-lms` | `evalzero-sunbird-lms` |
+| inQuiry (assessment + search) | `prativahq/evalzero-sunbird-inquiry` | `evalzero-sunbird-inquiry` |
+| Knowlg content | `prativahq/evalzero-sunbird-knowlg-service` | `knowlg` |
+| UserOrg / Lern | `prativahq/evalzero-sunbird-userorg` | `lern` |
+| RC — credentials | `prativahq/evalzero-sunbird-rc` | `evalzero-sunbird-rc` |
+| Telemetry | `prativahq/evalzero-sunbird-telemetry` | `evalzero-sunbird-telemetry` |
+| Infra (databases) | *local `docker-compose`* | `sunbird-local` |
+
+### Clone everything
+
+```bash
+mkdir -p ~/evalzero && cd ~/evalzero
+git clone https://github.com/prativahq/evalzero-sunbird-lms.git
+git clone https://github.com/prativahq/evalzero-sunbird-inquiry.git
+git clone https://github.com/prativahq/evalzero-sunbird-knowlg-service.git knowlg
+git clone https://github.com/prativahq/evalzero-sunbird-userorg.git
+git clone https://github.com/prativahq/evalzero-sunbird-rc.git
+```
+
+## Install & make live
+
+| Service | Install / build | Make it live |
+| --- | --- | --- |
+| **Infra** | `cd sunbird-local` | `docker compose up -d` |
+| **LMS app** | `cd evalzero-sunbird-lms && npm install` | `npm run dev` |
+| **inQuiry** | Docker-Maven build → dist ([setup](/inquiry/setup)) | `docker start assessment-service search-service` |
+| **Knowlg** | Docker-Maven build → dist | `docker start knowlg-content` |
+| **UserOrg** | Docker-Maven build → dist | `docker start lern-userorg` |
+| **Keycloak** | *pre-provisioned container* | `docker start kc_postgres kc_local` |
+| **RC** | `cd evalzero-sunbird-rc` | `docker compose up -d` |
+| **Email** | *shared listmonk container* | `docker start sahyogi_listmonk_app listmonk_db` |
 
 <Note>
-  On **this dev box** the microservices (assessment, search, knowlg, userorg, keycloak) are
-  **already-built long-running containers** — `docker start` is all you need day to day. On a
-  **fresh machine** they don't exist yet: you must build/create them first (Docker Maven → Play
-  dist, then `docker run`) — the recipes live in each service's folder — before `docker start`
-  applies.
+  Two kinds of "install": **compose** services (infra, RC) create their containers on first
+  `docker compose up`. **Play/Scala** services (inQuiry, Knowlg, UserOrg) must be **built once**
+  (Docker Maven → Play dist → `docker run`) — after that, `docker start <name>` is all you need. The
+  full build recipe is documented for inQuiry in [Fresh Machine Setup](/inquiry/setup); the other
+  Play services follow the same pattern.
 </Note>
 
 ## Why some start with `docker start`, not compose
 
-Only two folders own a `docker-compose.yml` that EvalZero uses: `sunbird-local` (infra) and
-`evalzero-sunbird-rc` (credentials). Everything else — Keycloak, UserOrg, Knowlg, the inQuiry
-services — was built once into standalone containers, so `docker compose up` in `sunbird-local`
-never touches them. Start those with `docker start <name>`.
+Only two folders own a `docker-compose.yml` EvalZero uses: `sunbird-local` (infra) and
+`evalzero-sunbird-rc` (credentials). The Play/Scala services were each built once into a standalone
+container, so `docker compose up` in `sunbird-local` never touches them — start those with
+`docker start <name>`.
 
 <Warning>
   Keycloak (`kc_local`) and its database (`kc_postgres`) are **not** part of the `sunbird-local`

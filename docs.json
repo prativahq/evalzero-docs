@@ -54,6 +54,7 @@
             "group": "inQuiry — Assessment",
             "pages": [
               "inquiry/overview",
+              "inquiry/setup",
               "inquiry/startup",
               "inquiry/dependencies",
               "inquiry/scoring"

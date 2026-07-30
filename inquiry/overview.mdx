@@ -8,7 +8,7 @@ to author, play and grade assessments. It runs against the shared `sunbird-local
 
 <CardGroup cols={2}>
   <Card title="Folder" icon="folder">
-    `/home/sdas/evalzero/evalzero-sunbird-inquiry`
+    `~/evalzero/evalzero-sunbird-inquiry`
   </Card>
   <Card title="Ports" icon="ethernet">
     assessment `:9010` · search `:9011`
@@ -20,6 +20,20 @@ to author, play and grade assessments. It runs against the shared `sunbird-local
     `docker start assessment-service search-service`
   </Card>
 </CardGroup>
+
+## Repository & run
+
+<Card title="Repository" icon="github" href="https://github.com/prativahq/evalzero-sunbird-inquiry">
+  `prativahq/evalzero-sunbird-inquiry`
+</Card>
+
+```bash
+git clone https://github.com/prativahq/evalzero-sunbird-inquiry.git   # install (then build)
+docker start assessment-service search-service                        # make it live
+```
+
+Fresh machine? The build (Docker Maven → dist → configure → seed Cassandra) is in
+[Fresh Machine Setup](/inquiry/setup). Once the containers exist, `docker start` is all you need.
 
 ## What it stores
 
