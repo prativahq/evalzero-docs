@@ -15,9 +15,17 @@ chmod +x build-and-run.sh
 ```
 
 The script: preflight (Docker + `.env`, bootstrapping from `.env.example` if missing) → pull the
-upstream ghcr images → `docker compose up -d` → run `enable-v2.sh` (init/unseal Vault, enable KV,
-create the per-service DBs, start identity/credential-schema/credential/claim-ms, restart registry
-with signing on) → verify health on the 1xxxx host band.
+upstream ghcr images → bring up the **shared infra** (db, keycloak, es, kafka, zookeeper, redis,
+file-storage) → run `enable-v2.sh` (init/unseal Vault, enable KV, create the per-service DBs, start
+identity/credential-schema/credential/claim-ms, restart registry with signing on) → `up -d` the
+remaining services → verify health on the 1xxxx host band.
+
+<Warning>
+  Order matters: **Vault boots sealed**, so its healthcheck fails until `enable-v2.sh` unseals it —
+  and `identity` has `depends_on: vault (service_healthy)`. A plain `docker compose up -d` therefore
+  aborts with *"vault is unhealthy; dependency failed to start"*. That's why the script starts the
+  infra first, unseals Vault via `enable-v2.sh`, and only then brings up the rest.
+</Warning>
 
 | Invocation | Effect |
 | --- | --- |
