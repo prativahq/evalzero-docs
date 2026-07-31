@@ -111,23 +111,21 @@ Point the service at the `sunbird-local` containers. Edit `assessment-runtime/co
 
 ## 6 · Prepare Cassandra
 
-The `dev_hierarchy_store` / `dev_question_store` keyspaces exist from Knowlg, but their tables lack
-the assessment columns. Apply the repo CQL, then add the missing columns.
+The `dev_hierarchy_store` / `dev_question_store` keyspaces are **shared with Knowlg**, which may
+create their tables *without* the assessment columns (`outcomeDeclaration`, `feedback`). A plain
+`CREATE TABLE IF NOT EXISTS` then no-ops and never adds them — so the schema step must
+**check-then-`ALTER`**.
 
 <Steps>
-  <Step title="Apply the base CQL (idempotent)">
+  <Step title="Apply the schema (idempotent)">
+    Run the wrapper — it applies `cassandra.cql`, then adds any missing assessment columns
+    (checking `system_schema.columns` first, since Cassandra 3.11 has no `ALTER … ADD IF NOT EXISTS`):
     ```bash
-    docker cp scripts/cassandra-db/cassandra.cql sunbird-local-cassandra-1:/tmp/cassandra.cql
-    docker exec sunbird-local-cassandra-1 cqlsh -f /tmp/cassandra.cql
+    ./scripts/cassandra-db/apply-schema.sh
+    # or against a differently-named container:
+    CASS_CONTAINER=my-cassandra ./scripts/cassandra-db/apply-schema.sh
     ```
-  </Step>
-  <Step title="Add assessment columns">
-    ```sql
-    ALTER TABLE dev_hierarchy_store.questionset_hierarchy ADD outcomeDeclaration text;
-    ALTER TABLE dev_question_store.question_data ADD outcomeDeclaration text;
-    ALTER TABLE dev_question_store.question_data ADD feedback text;
-    ```
-    Run via `docker exec -it sunbird-local-cassandra-1 cqlsh`.
+    Safe to re-run — existing columns are skipped, missing ones are added.
   </Step>
   <Step title="Seed category definitions">
     The service reads category defs from `dev_category_store.category_definition_data`. Clone the
