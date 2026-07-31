@@ -71,7 +71,7 @@
           },
           {
             "group": "Knowlg — Content",
-            "pages": ["knowlg/overview", "knowlg/startup"]
+            "pages": ["knowlg/overview", "knowlg/setup", "knowlg/startup"]
           },
           {
             "group": "RC — Credentials",

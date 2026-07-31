@@ -1,0 +1,111 @@
+---
+title: Knowlg — Fresh Machine Setup
+description: Build and run the Knowlg content-service from a git clone on a new machine.
+---
+
+The from-scratch build for `knowlg-content`. On a machine that already has the container, use
+[Startup](/knowlg/startup) (`docker start knowlg-content`). Knowlg is a Play/Scala service on the
+Sunbird `knowledge-platform`, built the same way as [inQuiry](/inquiry/setup).
+
+<Info>
+  Builds with **Docker Maven** (no host JDK), runs as a container on `sunbird-local_default`. Host
+  **9099** → container **9000** (host `:9000` is taken by listmonk).
+</Info>
+
+## Prerequisites
+
+Infra up (Cassandra, Neo4j, Redis, Elasticsearch, MinIO) and the shared network present — see
+[Infrastructure → Startup](/infra/startup).
+
+```bash
+cd ~/evalzero/sunbird-local && docker compose up -d
+docker network ls | grep sunbird-local_default
+```
+
+## 1 · Clone
+
+```bash
+cd ~/evalzero
+git clone https://github.com/prativahq/evalzero-sunbird-knowlg-service.git knowlg
+cd knowlg/evalzero-sunbird-knowlg-service
+```
+
+## 2 · Build (Docker Maven)
+
+Knowlg builds its own `knowledge-platform` core (graph-engine, graph-core, cloud-store-sdk) into
+`~/.m2`, so no external artifact prerequisite.
+
+```bash
+docker run --rm -v $PWD:/app -v $HOME/.m2:/root/.m2 -w /app \
+  --platform linux/amd64 maven:3.9-eclipse-temurin-11 \
+  mvn clean install -DskipTests -Dmaven.test.skip=true
+```
+
+## 3 · Package the dist
+
+Play-dist the **content-service** module:
+
+```bash
+docker run --rm -v $PWD:/app -v $HOME/.m2:/root/.m2 \
+  -w /app/content-api/content-service \
+  --platform linux/amd64 maven:3.9-eclipse-temurin-11 \
+  mvn play2:dist -Dplay2.fileWatchService=no -Dmaven.test.skip=true
+```
+
+Produces `content-api/content-service/target/content-service-1.0-SNAPSHOT-dist.zip`.
+
+## 4 · Assemble the runtime
+
+```bash
+mkdir -p knowlg-runtime && cd knowlg-runtime
+sudo cp ../content-api/content-service/target/content-service-1.0-SNAPSHOT-dist.zip .
+sudo chown $USER content-service-1.0-SNAPSHOT-dist.zip
+unzip -q content-service-1.0-SNAPSHOT-dist.zip     # → content-service-1.0-SNAPSHOT/ (lib/)
+mkdir -p config
+cp ../content-api/content-service/conf/application.conf config/
+cp ../content-api/content-service/conf/logback.xml      config/
+cd ..
+```
+
+## 5 · Configure
+
+Point `knowlg-runtime/config/application.conf` at the `sunbird-local` containers:
+
+| Setting | Value |
+| --- | --- |
+| Cassandra | `sunbird-local-cassandra-1:9042` |
+| Neo4j (bolt routes) | `bolt://sunbird-local-neo4j-1:7687` |
+| Redis | `sunbird-local-redis-1` |
+| Elasticsearch | `sunbird-local-elasticsearch-1:9200` |
+| Cloud storage (MinIO) | `http://sunbird-local-minio-1:9000` (`cephs3`, key/secret `minioadmin`) |
+
+## 6 · Run
+
+Host **9099** → container **9000** (this is the exact command the running container uses):
+
+```bash
+docker run -d --name knowlg-content --network sunbird-local_default -p 9099:9000 \
+  -v $PWD/knowlg-runtime/content-service-1.0-SNAPSHOT/lib:/app/lib:ro \
+  -v $PWD/knowlg-runtime/config:/app/config:ro \
+  -w /app --platform linux/amd64 eclipse-temurin:17-jre \
+  java -cp '/app/lib/*' -Dconfig.file=/app/config/application.conf \
+       -Dlogger.file=/app/config/logback.xml -Dhttp.port=9000 \
+       play.core.server.ProdServerStart /app
+```
+
+## 7 · Verify
+
+```bash
+curl -s localhost:9099/health | jq   # redis + graph + cassandra → healthy
+```
+
+<Note>
+  The LMS reaches Knowlg via `KNOWLG_BASE=http://localhost:9099` (the `config.ts` default of `:9000`
+  is overridden in `.env`).
+</Note>
+
+<Warning>
+  The exact module path (`content-api/content-service`) follows the standard Sunbird
+  `knowledge-platform` layout. If the reactor names it differently, run `mvn -pl` from the module
+  that produces `content-service-…-dist.zip`.
+</Warning>

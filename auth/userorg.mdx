@@ -22,9 +22,46 @@ git clone https://github.com/prativahq/evalzero-sunbird-userorg.git lern   # ins
 docker start lern-userorg                                                  # make it live → :9600
 ```
 
-UserOrg is a Play/Scala service — on a fresh machine it's built once (Docker Maven → Play dist →
-`docker run`, the same pattern as [inQuiry setup](/inquiry/setup)); afterwards `docker start` is
-enough.
+## Fresh machine build
+
+UserOrg (Lern) ships a **turnkey `build-and-run.sh`** — it builds, configures and starts the
+service in one go. No manual dist/extract steps like inQuiry.
+
+<Steps>
+  <Step title="Prerequisites">
+    Infra data layer up and the shared network present — `sunbird-local-cassandra-1`,
+    `sunbird-local-redis-1`, `sunbird-local-elasticsearch-1`, `sunbird-local-kafka-1`.
+  </Step>
+  <Step title="Clone">
+    ```bash
+    cd ~/evalzero
+    git clone https://github.com/prativahq/evalzero-sunbird-userorg.git lern
+    cd lern
+    ```
+  </Step>
+  <Step title="Build & run">
+    ```bash
+    chmod +x build-and-run.sh
+    ./build-and-run.sh
+    ```
+    The script: patches property files for the `sunbird-local` container hostnames → builds all
+    modules in Docker Maven → `play2:dist` the controller → extracts → writes a low-memory
+    `application.conf` overlay → starts the container on **:9600** → polls `/health` until healthy.
+  </Step>
+</Steps>
+
+<Warning>
+  The build uses a **separate Maven cache volume** (`userorg-m2-cache`) on purpose — UserOrg and the
+  LMS service both publish `org.sunbird:*:1.0-SNAPSHOT` artifacts (actor-core, platform-common,
+  cassandra-utils, es-utils), so sharing `~/.m2` would clash. Don't "fix" it to reuse the default cache.
+</Warning>
+
+<Note>
+  Manual build (from the README) uses the cloud-store flags:
+  `mvn clean install -DskipTests -DCLOUD_STORE_GROUP_ID=org.sunbird -DCLOUD_STORE_ARTIFACT_ID=cloud-store-sdk_2.13 -DCLOUD_STORE_VERSION=1.4.8`.
+  The Keycloak realm/client this service authenticates against is set up separately — see the
+  `keycloak_local_setup/` guide in the repo and [Auth → Keycloak](/auth/keycloak).
+</Note>
 
 ## Backing stores
 

@@ -37,8 +37,8 @@ git clone https://github.com/prativahq/evalzero-sunbird-rc.git
 | **Infra** | `cd sunbird-local` | `docker compose up -d` |
 | **LMS app** | `cd evalzero-sunbird-lms && npm install` | `npm run dev` |
 | **inQuiry** | Docker-Maven build → dist ([setup](/inquiry/setup)) | `docker start assessment-service search-service` |
-| **Knowlg** | Docker-Maven build → dist | `docker start knowlg-content` |
-| **UserOrg** | Docker-Maven build → dist | `docker start lern-userorg` |
+| **Knowlg** | Docker-Maven build → dist ([setup](/knowlg/setup)) | `docker start knowlg-content` |
+| **UserOrg** | `./build-and-run.sh` ([setup](/auth/userorg#fresh-machine-build)) | `docker start lern-userorg` |
 | **Keycloak** | *pre-provisioned container* | `docker start kc_postgres kc_local` |
 | **RC** | `cd evalzero-sunbird-rc` | `docker compose up -d` |
 | **Email** | *shared listmonk container* | `docker start sahyogi_listmonk_app listmonk_db` |
