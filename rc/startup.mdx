@@ -5,12 +5,31 @@ description: Bring up the Sunbird RC credentialing stack (only when issuing cert
 
 <Info>Folder: **`~/evalzero/evalzero-sunbird-rc`** · Optional stack</Info>
 
-RC is only needed when EvalZero issues or verifies certificates. Start the whole compose stack:
+RC is only needed when EvalZero issues or verifies certificates. One command brings up the whole
+stack and configures V2 (Vault + DID + signing):
 
 ```bash
 cd ~/evalzero/evalzero-sunbird-rc
-docker compose up -d
+chmod +x build-and-run.sh
+./build-and-run.sh
 ```
+
+The script: preflight (Docker + `.env`, bootstrapping from `.env.example` if missing) → pull the
+upstream ghcr images → `docker compose up -d` → run `enable-v2.sh` (init/unseal Vault, enable KV,
+create the per-service DBs, start identity/credential-schema/credential/claim-ms, restart registry
+with signing on) → verify health on the 1xxxx host band.
+
+| Invocation | Effect |
+| --- | --- |
+| `./build-and-run.sh` | Pull ghcr images, up, enable V2 (issue/verify works) |
+| `BUILD_IMAGES=1 …` | Build the images from source first (`make build` — heavy) |
+| `SKIP_V2=1 …` | V1 only — skip Vault + the credential/schema/identity node services |
+
+<Note>
+  There's no `mvn` build here (unlike the Play services) — the override pins upstream
+  `ghcr.io/sunbird-rc/*:${RELEASE_VERSION}` images. Re-running is safe: `enable-v2.sh` is idempotent
+  and **re-unseals Vault** after a `docker compose down`.
+</Note>
 
 ## Verify
 
@@ -18,6 +37,7 @@ docker compose up -d
 docker ps | grep evalzero-sunbird-rc     # registry / credential / schema up?
 curl -s localhost:18091/health | jq       # registry
 curl -s localhost:13000/health | jq       # credentials
+./demo-certificate.sh                      # end-to-end: issue → verify → PDF
 ```
 
 <Note>
