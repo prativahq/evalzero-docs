@@ -1,0 +1,72 @@
+---
+title: LMS App — Lern Service (courses)
+description: The Sunbird Lern LMS-service (course-mw) that backs enrolment, batches and progress on :9500.
+---
+
+The **Lern LMS-service** (course-mw) is the course/enrolment backend the EvalZero LMS App proxies
+to. It owns course **batches, enrolment, progress / content-state, the learner "My Courses" list,
+and page assembly**. The proxy reaches it via `LMS_BASE=http://localhost:9500`.
+
+<CardGroup cols={2}>
+  <Card title="Container" icon="box">`lern-lms`</Card>
+  <Card title="Port" icon="ethernet">`:9500`</Card>
+</CardGroup>
+
+## Do you need it?
+
+<Info>
+  **Yes for the learner course experience** — enrol, progress, batches, "My Courses". Authoring
+  (Knowlg) and assessments (inQuiry) don't need it. When it's down and dev/mock fallbacks are on,
+  the proxy serves **mock enrolments** instead of failing.
+</Info>
+
+The LMS proxies these to `:9500` (`server/src/routes/learner.routes.ts`):
+
+| Route | Purpose |
+| --- | --- |
+| `/api/learner/course/*` | enrolment, batches, content-state/progress, page assembly |
+| `/api/course/*` | course-batch ops, module-mentors |
+
+## Start it
+
+<Steps>
+  <Step title="Already built (this box)">
+    ```bash
+    docker start lern-lms          # → :9500
+    curl -s localhost:9500/health | jq
+    ```
+  </Step>
+  <Step title="Fresh machine — build & run">
+    The service ships a turnkey `build-and-run.sh` (Docker-Maven → dist → run), same pattern as
+    UserOrg:
+    ```bash
+    cd ~/evalzero/lern/evalzero-sunbird-lern/lms-service
+    chmod +x build-and-run.sh
+    ./build-and-run.sh
+    ```
+    It patches property files for the `sunbird-local` container hostnames → builds all modules in
+    Docker Maven → `play2:dist` → extracts → starts the container on **:9500** → polls `/health`.
+  </Step>
+</Steps>
+
+<Warning>
+  The Docker-Maven build runs as **root**, so `target/` is root-owned and extracting the dist as your
+  user fails with *"Permission denied — cannot create lms-service-1.0-SNAPSHOT"*. `build-and-run.sh`
+  now `chown`s `target/` before `unzip` (the same root-owned-`target/` fix carried across the
+  userorg / knowlg / inquiry build scripts).
+</Warning>
+
+## Backing stores
+
+| Store | For |
+| --- | --- |
+| Cassandra | `sunbird_courses` keyspace: `user_enrolments`, `course_batch`, `content_consumption` |
+| Redis | Cache |
+| Elasticsearch | Course-batch / enrolment search (`course_batch` index, `inx_cou_bat_courseid`) |
+
+<Note>
+  Required infra: `sunbird-local-cassandra-1`, `sunbird-local-redis-1`,
+  `sunbird-local-elasticsearch-1`. Fresh DBs need the full `user_enrolments` schema
+  (`completionpercentage`, `completedon text`, …) — a thin table causes *Undefined column* errors on
+  enrol. See [LMS troubleshooting](/lms/troubleshooting).
+</Note>

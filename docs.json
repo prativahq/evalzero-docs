@@ -46,6 +46,7 @@
             "pages": [
               "lms/overview",
               "lms/startup",
+              "lms/lern-service",
               "lms/configuration",
               "lms/troubleshooting"
             ]
