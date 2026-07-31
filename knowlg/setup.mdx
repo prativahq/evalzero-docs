@@ -12,6 +12,13 @@ Sunbird `knowledge-platform`, built the same way as [inQuiry](/inquiry/setup).
   **9099** → container **9000** (host `:9000` is taken by listmonk).
 </Info>
 
+<Tip>
+  **Fast path — copy instead of build.** If another box already has the built dist, skip the build:
+  `rsync` the `content-service-1.0-SNAPSHOT` folder (~186 MB, includes `config/`, `lib/`, `schemas/`)
+  to the new machine and jump to [Run](#6-run). It carries the `sunbird-local` container hostnames
+  in its `config/application.conf`, so it runs as-is.
+</Tip>
+
 ## Prerequisites
 
 Infra up (Cassandra, Neo4j, Redis, Elasticsearch, MinIO) and the shared network present — see

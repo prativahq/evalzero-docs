@@ -30,25 +30,46 @@ git clone https://github.com/prativahq/evalzero-sunbird-userorg.git
 git clone https://github.com/prativahq/evalzero-sunbird-rc.git
 ```
 
-## Install & make live
+## Install & make live — in order
 
-| Service | Install / build | Make it live |
-| --- | --- | --- |
-| **Infra** | `cd sunbird-local` | `docker compose up -d` |
-| **LMS app** | `cd evalzero-sunbird-lms && npm install` | `npm run dev` |
-| **inQuiry** | Docker-Maven build → dist ([setup](/inquiry/setup)) | `docker start assessment-service search-service` |
-| **Knowlg** | Docker-Maven build → dist ([setup](/knowlg/setup)) | `docker start knowlg-content` |
-| **UserOrg** | `./build-and-run.sh` ([setup](/auth/userorg#fresh-machine-build)) | `docker start lern-userorg` |
-| **Keycloak** | *pre-provisioned container* | `docker start kc_postgres kc_local` |
-| **RC** | `cd evalzero-sunbird-rc` | `docker compose up -d` |
-| **Email** | *shared listmonk container* | `docker start sahyogi_listmonk_app listmonk_db` |
+Bring services up **top to bottom**: the foundation first, the microservices next (each waits on
+its dependencies), and the **LMS app last** because it depends on all of them. Optional services
+(RC, Email) can be skipped.
+
+| # | Service | Depends on | Install / build | Make it live |
+| --- | --- | --- | --- | --- |
+| 1 | **Infra** | — *(foundation)* | `cd sunbird-local` | `docker compose up -d` |
+| 2 | **Keycloak** | — *(own Postgres)* | *pre-provisioned* | `docker start kc_postgres kc_local` |
+| 3 | **Knowlg** | Infra | build → dist ([setup](/knowlg/setup)) | `docker start knowlg-content` |
+| 4 | **inQuiry** | Infra *(+ Knowlg category seed)* | build → dist ([setup](/inquiry/setup)) | `docker start assessment-service search-service` |
+| 5 | **UserOrg** | Infra + Keycloak | `./build-and-run.sh` ([setup](/auth/userorg#fresh-machine-build)) | `docker start lern-userorg` |
+| 6 | **RC** *(optional)* | — *(self-contained)* | `cd evalzero-sunbird-rc` | `docker compose up -d` |
+| 7 | **Email** *(optional)* | — | *shared listmonk* | `docker start sahyogi_listmonk_app listmonk_db` |
+| 8 | **LMS app** | **all of the above** | `cd evalzero-sunbird-lms && npm install` | `npm run dev` |
+
+### Dependency layers
+
+<Steps>
+  <Step title="Layer 1 — Infra (foundation)">
+    Cassandra, Neo4j, Redis, Elasticsearch, MinIO, (Kafka) — every microservice reads/writes these.
+    Keycloak is independent (it ships its own Postgres), so it can start any time before the LMS.
+  </Step>
+  <Step title="Layer 2 — Microservices">
+    **Knowlg**, **inQuiry** and **UserOrg** each need Layer 1 up first. inQuiry also expects the
+    Cassandra category-definition seed done during its setup; UserOrg additionally needs Keycloak
+    for its realm.
+  </Step>
+  <Step title="Layer 3 — LMS app (last)">
+    `evalzero-sunbird-lms` proxies to Keycloak (login), UserOrg (profile), Knowlg (content) and
+    inQuiry (assessments) — so start it only once those are healthy.
+  </Step>
+</Steps>
 
 <Note>
-  Two kinds of "install": **compose** services (infra, RC) create their containers on first
-  `docker compose up`. **Play/Scala** services (inQuiry, Knowlg, UserOrg) must be **built once**
-  (Docker Maven → Play dist → `docker run`) — after that, `docker start <name>` is all you need. The
-  full build recipe is documented for inQuiry in [Fresh Machine Setup](/inquiry/setup); the other
-  Play services follow the same pattern.
+  Two kinds of "install": **compose** services (Infra, RC) create their containers on first
+  `docker compose up`. **Play/Scala** services (Knowlg, inQuiry, UserOrg) must be **built once**
+  (Docker Maven → Play dist → `docker run`) — after that, `docker start <name>` is all you need. Full
+  recipes: [Knowlg](/knowlg/setup), [inQuiry](/inquiry/setup), [UserOrg](/auth/userorg#fresh-machine-build).
 </Note>
 
 ## Why some start with `docker start`, not compose
