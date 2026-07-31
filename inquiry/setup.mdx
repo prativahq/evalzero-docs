@@ -103,24 +103,35 @@ columns, category defs — is wired. The LMS reaches it via `INQUIRY_BASE=http:/
 ## search-service (:9011)
 
 The editor/player need `questionset/v4/hierarchy/:id?mode=edit`, which calls composite search, so
-`search-service` must be running for **edit** reads. It's built separately from the knowlg
-`knowledge-platform` (`search-api/search-service`, same Docker-Maven → `play2:dist`) and extracted
-to `search-runtime/`. Once that exists, `RUN_SEARCH=1 ./build-and-run.sh` brings it up, or run it
-directly:
+`search-service` must be running for **edit** reads. Its source lives in the knowlg
+`knowledge-platform` (`search-api/search-service`) but its runtime + config live here under
+`search-runtime/`. A second one-command script does the whole chain — build → dist → runtime →
+config → ES index → run → verify:
 
 ```bash
-docker run -d --name search-service --network sunbird-local_default -p 9011:9000 \
-  -v $PWD/search-runtime/search-service-1.0-SNAPSHOT:/app/dist:ro \
-  -v $PWD/search-runtime/config:/app/config:ro \
-  -w /app --platform linux/amd64 eclipse-temurin:17-jre \
-  sh /app/dist/start -Dhttp.port=9000 -Dpidfile.path=/dev/null \
-  -Dconfig.file=/app/config/application.conf -Dlogger.file=/app/config/logback.xml
+./build-and-run-search-service.sh
 ```
 
-Its `config/application.conf` needs `search.es_conn_info = "sunbird-local-elasticsearch-1:9200"`
-and `play.modules.enabled += modules.SearchModule` (or Guice fails to bind `SearchActor`). Create
-the empty `compositesearch` ES index — hierarchy reads work immediately; result rows fill once the
-Flink indexer runs.
+<Info>
+  It builds from the knowlg checkout — set `KNOWLG_KP=/path/to/knowledge-platform` if yours isn't at
+  the default `~/evalzero/knowlg/evalzero-sunbird-knowlg-service/knowledge-platform`. Build the knowlg
+  content-service first so `~/.m2` has the `org.sunbird` artifacts.
+</Info>
+
+| Invocation | Effect |
+| --- | --- |
+| `./build-and-run-search-service.sh` | Full: Docker-Maven build (`-pl search-api/search-service -am`) → dist → runtime → config → ES index → run :9011 |
+| `SKIP_BUILD=1 …` | Reuse the existing dist zip |
+| `SKIP_ESINDEX=1 …` | Don't (re)create the `compositesearch` index |
+
+The generated `config/application.conf` sets `search.es_conn_info =
+"sunbird-local-elasticsearch-1:9200"`, enables `play.modules.enabled += modules.SearchModule` (or
+Guice fails to bind `SearchActor`), and relaxes CSRF + AllowedHosts for the LMS composite-search
+call. The ES step (re)creates the `compositesearch` index with the **canonical settings + mappings**
+(nested `trackable`/`batches`/… + the `cs_index`/`cs_search` analyzers) via
+`rebuild-compositesearch.sh` — hierarchy reads work without it, but composite-search *results* need
+it. Once the runtime exists, `RUN_SEARCH=1 ./build-and-run.sh` also brings the container up as part
+of the assessment run.
 
 ## Verify
 
