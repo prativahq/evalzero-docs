@@ -11,6 +11,20 @@ project of databases, object storage and messaging.
   <Card title="Start" icon="play">`docker compose up -d`</Card>
 </CardGroup>
 
+## Repository & run
+
+<Card title="Repository" icon="github" href="https://github.com/prativahq/evalzero-sunbird-local-infra">
+  `prativahq/evalzero-sunbird-local-infra`
+</Card>
+
+```bash
+git clone https://github.com/prativahq/evalzero-sunbird-local-infra.git sunbird-local   # install
+cd sunbird-local
+docker compose up -d                                                                    # make it live
+```
+
+Compose **creates** every database/storage container on first run — no separate build step.
+
 ## Services & ports
 
 | Service | Container | Host port | Role |

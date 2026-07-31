@@ -16,12 +16,13 @@ command that makes it **live**. All repos are under [`github.com/prativahq`](htt
 | UserOrg / Lern | `prativahq/evalzero-sunbird-userorg` | `lern` |
 | RC — credentials | `prativahq/evalzero-sunbird-rc` | `evalzero-sunbird-rc` |
 | Telemetry | `prativahq/evalzero-sunbird-telemetry` | `evalzero-sunbird-telemetry` |
-| Infra (databases) | *local `docker-compose`* | `sunbird-local` |
+| Infra (databases) | `prativahq/evalzero-sunbird-local-infra` | `sunbird-local` |
 
 ### Clone everything
 
 ```bash
 mkdir -p ~/evalzero && cd ~/evalzero
+git clone https://github.com/prativahq/evalzero-sunbird-local-infra.git sunbird-local
 git clone https://github.com/prativahq/evalzero-sunbird-lms.git
 git clone https://github.com/prativahq/evalzero-sunbird-inquiry.git
 git clone https://github.com/prativahq/evalzero-sunbird-knowlg-service.git knowlg
