@@ -80,10 +80,12 @@ columns, category defs — is wired. The LMS reaches it via `INQUIRY_BASE=http:/
     for the assessment columns (`outcomeDeclaration`, `feedback`) that Knowlg-created shared tables
     may lack. See the warning below.
   </Step>
-  <Step title="6 · Category-definition check">
-    Verifies the question/questionset category rows exist in
-    `dev_category_store.category_definition_data`. Warns (does not fail) if they're missing — seed
-    them or `create` returns `ResourceNotFoundException`. See [Dependencies](/inquiry/dependencies).
+  <Step title="6 · Category-definition seed">
+    Checks `dev_category_store.category_definition_data` for the questionset/question defs and, if
+    missing, **seeds them** from the bundled `scripts/cassandra-db/category-definitions.csv` (the 5
+    `_questionset_all` / `_question_all` rows). Without these, `create` fails with `Validation
+    Errors` / `ResourceNotFoundException` on a fresh DB — the base content-category seed doesn't
+    include them. See [Dependencies](/inquiry/dependencies).
   </Step>
   <Step title="7 · Run + verify">
     Starts the `assessment-service` container (host **9010** → container **9000**) and polls

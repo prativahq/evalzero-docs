@@ -35,6 +35,36 @@ docker start assessment-service search-service                        # make it 
 Fresh machine? The build (Docker Maven → dist → configure → seed Cassandra) is in
 [Fresh Machine Setup](/inquiry/setup). Once the containers exist, `docker start` is all you need.
 
+## QuML — the content format
+
+inQuiry speaks **QuML (Question Markup Language)** — Sunbird's open, player-agnostic spec for
+representing questions and question sets. Every authored object is a QuML document, stored in
+Cassandra/Neo4j and **validated against a QuML JSON schema** on every create/update.
+
+Two object types:
+
+| Object | `mimeType` | What it is |
+| --- | --- | --- |
+| **Question** | `application/vnd.sunbird.question` | A single item — MCQ, subjective, fill-in-the-blank |
+| **QuestionSet** | `application/vnd.sunbird.questionset` | An ordered collection of questions (and nested sub-sets) |
+
+The fields that make a QuML object:
+
+| Field | Meaning |
+| --- | --- |
+| `primaryCategory` | The category definition it binds to — e.g. `Multiple Choice Question`, `Practice Question Set`. Must be seeded (see [Dependencies](/inquiry/dependencies)) or `create` fails. |
+| `interactions` | How the learner answers (`choice`, `text`, …) |
+| `responseDeclaration` | The correct answer + per-question scoring (`maxScore`, `cardinality`, `correctResponse`) |
+| `outcomeDeclaration` | Set-level scoring rules (aggregation across questions) |
+| `body` / `editorState` | The rendered question markup + the authoring UI state |
+
+<Note>
+  Validation runs against `schemas/<objectType>/1.0/` (mounted at `/app/schemas/`). A payload that
+  doesn't match the QuML schema returns `Validation Errors` → `SERVER_ERROR`. The most common cause
+  is sending create fields at the wrong nesting level (they must sit under `request.question` /
+  `request.questionset`) or an unseeded `primaryCategory`.
+</Note>
+
 ## What it stores
 
 Questions and question sets split across two databases:

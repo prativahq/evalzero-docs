@@ -1,0 +1,127 @@
+---
+title: inQuiry — APIs
+description: The Question and QuestionSet REST API — create, read, hierarchy, play and submit.
+---
+
+All endpoints are on the assessment-service at **`http://localhost:9010`** (the LMS proxies them
+under `/api/question/*` and `/api/questionset/*`). Every request and response uses the Sunbird
+envelope.
+
+## The envelope
+
+**Request** — the object always sits under `request.<objectType>`:
+```json
+{ "request": { "questionset": { "code": "…", "name": "…", "primaryCategory": "Practice Question Set" } } }
+```
+
+**Response** — status lives in `params`; payload in `result`:
+```json
+{
+  "id": "api.questionset.create",
+  "params": { "status": "successful", "err": null, "errmsg": null },
+  "responseCode": "OK",
+  "result": { "identifier": "do_2137…", "versionKey": "1785…" }
+}
+```
+`responseCode` is `OK` on success; `CLIENT_ERROR` / `SERVER_ERROR` on failure (with `params.err` /
+`params.errmsg`). A **bare `SERVER_ERROR` with `ERR_SYSTEM_EXCEPTION`** usually means a QuML
+**validation** failure — fields at the wrong nesting level, or an unseeded `primaryCategory`.
+
+<Warning>
+  The `<objectType>` wrapper is mandatory. `{"request":{"code":…}}` (fields directly under
+  `request`) fails validation → `SERVER_ERROR`. It must be `{"request":{"questionset":{"code":…}}}`.
+</Warning>
+
+## Health
+
+```bash
+curl -s localhost:9010/health | jq
+# {"result":{"checks":[…cassandra, neo4j, redis…]}, "responseCode":"OK"}
+```
+
+## Question APIs
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/question/v4/create` | Create a question (Draft) |
+| `GET` | `/question/v4/read/:id` | Read a question (`?fields=…` to project) |
+| `PATCH` | `/question/v4/update/:id` | Update metadata |
+| `POST` | `/question/v4/review/:id` | Draft → Review |
+| `GET` | `/question/v4/list` | Batch read by identifier list |
+
+**Create a question:**
+```bash
+curl -s -X POST localhost:9010/question/v4/create \
+  -H 'Content-Type: application/json' \
+  -d '{"request":{"question":{
+        "code":"q-1","name":"2+2","mimeType":"application/vnd.sunbird.question",
+        "primaryCategory":"Multiple Choice Question"}}}' | jq .result.identifier
+```
+
+## QuestionSet APIs
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/questionset/v4/create` | Create a set (Draft) |
+| `GET` | `/questionset/v4/read/:id` | Read set metadata (shallow) |
+| `PATCH` | `/questionset/v4/hierarchy/update` | Add / update questions **inline** (the workhorse) |
+| `GET` | `/questionset/v4/hierarchy/:id?mode=edit` | Read the full draft tree (**needs search-service**) |
+| `POST` | `/questionset/v4/add` | Add existing questions to a set |
+| `POST` | `/questionset/v4/review/:id` | Draft → Review |
+| `POST` | `/questionset/v4/publish/:id` | Review → Live *(Flink pipeline — optional, see below)* |
+
+**Create a set:**
+```bash
+curl -s -X POST localhost:9010/questionset/v4/create \
+  -H 'Content-Type: application/json' \
+  -d '{"request":{"questionset":{
+        "code":"qs-1","name":"Smoke","mimeType":"application/vnd.sunbird.questionset",
+        "primaryCategory":"Practice Question Set"}}}' | jq .result.identifier
+```
+
+**Add a question inline (create the question + attach it in one call)** — `nodesModified` carries a
+new question keyed by a temp id, `hierarchy` places it under the set:
+```bash
+curl -s -X PATCH localhost:9010/questionset/v4/hierarchy/update \
+  -H 'Content-Type: application/json' \
+  -d '{"request":{"data":{
+    "hierarchy":{"<SET_ID>":{"name":"Smoke","children":["tmpq_0"],"root":true}},
+    "nodesModified":{"tmpq_0":{"root":false,"objectType":"Question","isNew":true,"metadata":{
+      "code":"q-1","name":"Q1","mimeType":"application/vnd.sunbird.question",
+      "primaryCategory":"Multiple Choice Question","qType":"MCQ",
+      "body":"<p>2 + 2 = ?</p>","interactions":{"response1":{"type":"choice"}},
+      "responseDeclaration":{"response1":{"maxScore":1,"cardinality":"single","type":"integer","correctResponse":{"value":"0"}}}
+    }}}
+  }}}' | jq '.result.identifiers'
+```
+
+**Read the draft tree** (requires `search-service` on :9011):
+```bash
+curl -s "localhost:9010/questionset/v4/hierarchy/<SET_ID>?mode=edit" | jq '.result.questionSet.children[].identifier'
+```
+
+## Play &amp; Submit (LMS secure grading)
+
+Authoring lives on the service above; **grading** is done by the **LMS proxy**
+(`server/src/routes/inquiry.routes.ts`), not by publishing. The client never sees the answer key:
+
+| Method | Path (LMS) | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/inquiry/play/:courseId` | Serve the set **without** `responseDeclaration` (answers stripped) |
+| `POST` | `/api/inquiry/submit` | Score server-side against the stored answer key → persist the attempt |
+
+See [Scoring](/inquiry/scoring) for the weighted / partial-credit logic and re-evaluation.
+
+## Publish (optional)
+
+`questionset/v4/publish` (Review → Live) runs through a **Flink** job, not the API — and it's **not
+required**: EvalZero grades via `/play` + `/submit`, so a set stays `Draft` and still works
+end-to-end. The publish pipeline is currently blocked at the final Neo4j write in the Flink
+TaskManager. See [Dependencies](/inquiry/dependencies) and [Fresh Machine Setup](/inquiry/setup).
+
+## Smoke test
+
+The repo ships `scripts/test.sh` — create set → add question inline → read hierarchy:
+```bash
+./scripts/test.sh    # ✅ SMOKE TEST PASSED prints the set + question ids
+```

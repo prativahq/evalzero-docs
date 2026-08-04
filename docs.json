@@ -58,6 +58,7 @@
               "inquiry/setup",
               "inquiry/startup",
               "inquiry/dependencies",
+              "inquiry/apis",
               "inquiry/scoring"
             ]
           },
@@ -76,7 +77,7 @@
           },
           {
             "group": "RC — Credentials",
-            "pages": ["rc/overview", "rc/setup", "rc/dependencies", "rc/startup"]
+            "pages": ["rc/overview", "rc/setup", "rc/dependencies", "rc/startup", "rc/apis"]
           },
           {
             "group": "Infrastructure",
