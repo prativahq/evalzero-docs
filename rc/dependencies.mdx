@@ -1,0 +1,91 @@
+---
+title: RC — Installation & Dependencies
+description: What must be present before installing RC, and the internal order its own services start in.
+---
+
+Unlike the Play services, RC does **not** depend on the `sunbird-local` infra — it's a
+**self-contained** compose stack that ships its own Postgres, Vault, Keycloak, Elasticsearch, Redis,
+Kafka and MinIO. So "dependencies" splits in two: what the **host** needs before you install, and the
+**internal order** RC's own services must start in.
+
+## Host prerequisites (before install)
+
+<Steps>
+  <Step title="Docker + compose v2">
+    Docker running and `docker compose` (v2) available. No host JDK/Maven needed — RC pins prebuilt
+    `ghcr.io/sunbird-rc/*` images.
+    ```bash
+    docker info >/dev/null && docker compose version
+    ```
+  </Step>
+  <Step title="openssl, curl, jq">
+    `openssl` (generates the `.env` secrets), plus `curl` + `jq` for the health checks and the demo.
+  </Step>
+  <Step title="Free host ports (1xxxx band)">
+    RC remaps its host ports to a 1xxxx band so it won't clash with sunbird-local / Keycloak /
+    Grafana / etc. Make sure these are free: `18091` (registry), `13000` (credential), `3333`
+    (schema), `3332` (identity), `8200` (vault), `18083` (keycloak), `18080` (nginx), plus the
+    remapped db / es / redis / kafka / minio ports.
+    ```bash
+    for p in 18091 13000 3333 3332 8200 18083 18080; do
+      ss -ltn "sport = :$p" | grep -q LISTEN && echo "IN USE: $p" || echo "free: $p"
+    done
+    ```
+  </Step>
+  <Step title="A working .env (the #1 gotcha)">
+    RC's `.env` is **gitignored**, so a fresh clone has none. Without it every image ref becomes
+    `…:` (empty `RELEASE_VERSION`) → *"invalid reference format"* and nothing starts. `build-and-run.sh`
+    bootstraps it from `.env.example`; `setup-new-2.sh` writes a complete one. At minimum it must set
+    `RELEASE_VERSION` **and** `POSTGRES_PASSWORD` — see [Setup](/rc/setup).
+  </Step>
+</Steps>
+
+<Warning>
+  **Not a dependency:** the `sunbird-local` stack (Cassandra / Neo4j / the shared Postgres). RC is
+  independent — you can run it on a box that has none of them. Do **not** point RC at the shared
+  Postgres; it uses its own `db` container.
+</Warning>
+
+## Internal start order (RC's own services)
+
+RC's services depend on each other, and the order is **load-bearing** — it's why there's a script
+instead of a bare `docker compose up -d`.
+
+| # | Service(s) | Waits on | Notes |
+| --- | --- | --- | --- |
+| 1 | `db`, `keycloak` | — | Neither depends on Vault, so they start first. `db` must accept connections before step 3. |
+| 2 | `vault` | — | Boots **sealed** → healthcheck fails until unsealed. |
+| 3 | *create databases* | `db` up | `identity`, `credential_schema`, `credential` DBs are created via `psql` inside the `db` container. |
+| 4 | `identity` | `vault` healthy + its DB | DID service. `depends_on: vault (service_healthy)`. |
+| 5 | `credential-schema` | `identity` | |
+| 6 | `credential`, `claim-ms` | `credential-schema` | |
+| 7 | `registry` | above | Force-recreated so it picks up signing/DID env. |
+
+<Warning>
+  **Why a plain `docker compose up -d` fails.** Vault boots sealed → unhealthy, and `identity` has
+  `depends_on: vault (service_healthy)`, so a blanket up **aborts** with *"vault is unhealthy;
+  dependency failed to start"*. `build-and-run.sh` / `enable-v2.sh` therefore start `db`+`keycloak`,
+  unseal Vault, create the databases, then bring up the rest.
+</Warning>
+
+<Warning>
+  **`FATAL: database "identity" does not exist`** means step 3 ran before `db` was up (or was skipped),
+  so `identity` crash-loops. Fix: ensure `db` is running, then re-run `enable-v2.sh` — its
+  `CREATE DATABASE` loop is idempotent and will create the missing databases. `enable-v2.sh` now starts
+  `db`+`keycloak` and waits for Postgres itself before that loop.
+</Warning>
+
+## Vault key files
+
+Vault re-seals on every restart, so the unseal material must survive between runs.
+
+| File | Created by | Holds | Rule |
+| --- | --- | --- | --- |
+| `keys.txt` | `enable-v2.sh` (first init) | 5 unseal keys + root token | **Never commit.** Losing it = can't unseal = signing keys unreachable. Gitignored. |
+| `.env` `VAULT_TOKEN` | `enable-v2.sh` | Vault root token | Written on first init; blank triggers a fresh init. |
+
+<Info>
+  Re-running is safe: `enable-v2.sh` is idempotent and **re-unseals** Vault (reading the 3 keys from
+  `keys.txt`) after any `docker compose down`. That's why you must re-run it — not just
+  `docker start` — after stopping the stack.
+</Info>

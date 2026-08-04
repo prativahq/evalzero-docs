@@ -1,0 +1,118 @@
+---
+title: RC — Fresh Machine Setup
+description: Clone, write the .env, and run build-and-run.sh to bring the credentialing stack up from scratch.
+---
+
+The **from-scratch** path: clone → ensure `.env` → `./build-and-run.sh`. The script does the whole
+recipe — pull images → start infra → unseal Vault → create DBs → start the node services → verify —
+in one shot. On a machine that already has the containers, use [Startup](/rc/startup) instead.
+
+<Info>
+  RC is **self-contained** — no host JDK/Maven, and it does **not** need the `sunbird-local` stack.
+  Everything runs as containers on a 1xxxx host-port band. Target folder:
+  `~/evalzero/evalzero-sunbird-rc`. Confirm the [host prerequisites](/rc/dependencies) first.
+</Info>
+
+## Clone & run
+
+```bash
+cd ~/evalzero
+git clone https://github.com/prativahq/evalzero-sunbird-rc.git
+cd evalzero-sunbird-rc
+chmod +x build-and-run.sh
+./build-and-run.sh
+```
+
+A healthy `:18091/health` (registry) and `:13000/health` (credential) at the end means Vault is
+unsealed, the per-service databases exist, and identity/schema/credential are wired.
+
+### Flags
+
+| Invocation | Effect |
+| --- | --- |
+| `./build-and-run.sh` | Pull ghcr images → up infra → enable V2 → up rest → verify (issue/verify works) |
+| `BUILD_IMAGES=1 ./build-and-run.sh` | Build the images from source first (`make build` — heavy) |
+| `SKIP_V2=1 ./build-and-run.sh` | V1 only — skip Vault + identity/schema/credential (no certificates) |
+
+## The `.env` (gitignored — write it before running)
+
+RC's `.env` never ships with the clone. `build-and-run.sh` bootstraps it from `.env.example`;
+`setup-new-2.sh` writes a complete one. The two vars whose absence breaks the stack are
+`RELEASE_VERSION` (empty → *"invalid reference format"*) and `POSTGRES_PASSWORD` (empty → `db` exits →
+identity crash-loops).
+
+```bash
+RELEASE_VERSION=v2.0.1
+POSTGRES_PASSWORD=<openssl rand -hex 16>
+MINIO_ROOT_USER=rcadmin
+MINIO_ROOT_PASSWORD=<openssl rand -hex 16>
+KEYCLOAK_ADMIN_USER=admin
+KEYCLOAK_ADMIN_PASSWORD=<openssl rand -hex 16>
+VAULT_TOKEN=                 # blank on purpose → enable-v2.sh inits THIS host's Vault
+QR_TYPE=URL                  # QR encodes a verify URL, not the raw VC
+CREDENTIAL_SERVICE_BASE_URL=https://lms.evalzero.com   # base of the certificate QR's verify URL
+```
+
+<Note>
+  Leave `VAULT_TOKEN` **blank** on a fresh host — `enable-v2.sh` initializes a new Vault, writes
+  `keys.txt`, and fills `VAULT_TOKEN` in for you. A stale token from another machine will not work.
+</Note>
+
+## What `build-and-run.sh` does
+
+<Steps>
+  <Step title="0 · Preflight">
+    Checks Docker + compose v2, and that `.env` exists — bootstrapping from `.env.example` if missing.
+    Prints `RELEASE_VERSION`.
+  </Step>
+  <Step title="1 · Images">
+    `docker compose pull` grabs the `ghcr.io/sunbird-rc/*:${RELEASE_VERSION}` images. `BUILD_IMAGES=1`
+    runs `make build` from source instead (slow).
+  </Step>
+  <Step title="2 · Start shared infra first">
+    `docker compose up -d db keycloak es kafka zookeeper redis file-storage` — deliberately **not**
+    Vault/identity/registry, which would abort on the sealed-Vault dependency.
+  </Step>
+  <Step title="3 · enable-v2.sh (the credentialing brain)">
+    Init + unseal Vault → enable the KV engine → start `db`+`keycloak` and wait for Postgres →
+    **create the `identity` / `credential_schema` / `credential` databases** → start
+    identity → credential-schema → credential → claim-ms → force-recreate registry with signing/DID on.
+  </Step>
+  <Step title="3b · Full up">
+    Vault is healthy now, so a blanket `docker compose up -d` safely starts anything still down (nginx…).
+  </Step>
+  <Step title="4 · Verify">
+    Polls `registry :18091/health` and `credential :13000/health`, then prints the endpoint map.
+  </Step>
+</Steps>
+
+<Warning>
+  **Order matters.** Vault boots sealed, so `identity`'s `depends_on: vault (service_healthy)` makes a
+  plain `docker compose up -d` abort. That's why infra starts first and `enable-v2.sh` unseals Vault
+  before the node services. See [Dependencies](/rc/dependencies).
+</Warning>
+
+## Verify end-to-end
+
+```bash
+docker ps | grep evalzero-sunbird-rc     # registry / credential / schema / identity up?
+curl -s localhost:18091/health | jq       # registry
+curl -s localhost:13000/health | jq       # credentials
+./demo-certificate.sh                      # issue → sign → verify (proof OK) → render PDF
+```
+
+A rendered, verifiable PDF from `demo-certificate.sh` means the whole chain is wired. Then set the
+LMS `.env` (`RC_BASE`, `RC_CRED_BASE`, `RC_SCHEMA_BASE`, `RC_ISSUE_ENABLED=true`, `RC_ISSUER_DID`,
+`RC_SCHEMA_ID`, `RC_TEMPLATE_ID`) — see [Overview](/rc/overview).
+
+## As part of the full VM install
+
+`setup-new-2.sh` installs RC for you (unless `--skip-heavy`): it clones the repo, writes a complete
+`.env` (generated passwords, `RELEASE_VERSION=v2.0.1`, blank `VAULT_TOKEN`), runs `enable-v2.sh`, and
+health-checks `:18091`. On a fresh box that's the one-command path; this page is the manual
+equivalent.
+
+<Note>
+  There's no `mvn` build here (unlike the Play services) — RC pins upstream images. Re-running any of
+  these is safe: `enable-v2.sh` is idempotent and **re-unseals Vault** after a `docker compose down`.
+</Note>

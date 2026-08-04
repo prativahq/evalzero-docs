@@ -1,58 +1,99 @@
 ---
 title: RC — Overview
-description: Sunbird RC — the registry and credentialing stack behind certificates.
+description: Sunbird RC — the registry and credentialing stack behind verifiable certificates.
 ---
 
-**Sunbird RC** (Registry &amp; Credentialing) issues and verifies the verifiable credentials behind
-certificates. It's a self-contained compose stack and is **optional** — EvalZero runs fully without
-it.
+**Sunbird RC** (Registry &amp; Credentialing) issues and verifies the **verifiable credentials**
+behind EvalZero's certificates. When a learner completes a course, RC produces a cryptographically
+signed certificate that anyone can verify — no need to trust the PDF or call our servers. It's a
+self-contained compose stack and is **optional**: the LMS, assessments and auth all run without it.
 
 <CardGroup cols={2}>
   <Card title="Folder" icon="folder">`~/evalzero/evalzero-sunbird-rc`</Card>
-  <Card title="Start" icon="play">`docker compose up -d`</Card>
+  <Card title="Start" icon="play">`./build-and-run.sh`</Card>
   <Card title="Gate" icon="toggle-on">`.env` `RC_ISSUE_ENABLED`</Card>
-  <Card title="Status" icon="circle-pause">Mostly stopped by default</Card>
+  <Card title="Self-contained" icon="box">Own db · vault · keycloak · es · kafka</Card>
 </CardGroup>
 
-## Repository & run
+## How it works (plain words)
 
-<Card title="Repository" icon="github" href="https://github.com/prativahq/evalzero-sunbird-rc">
-  `prativahq/evalzero-sunbird-rc`
-</Card>
+Think of a **passport**: it carries a seal that's very hard to fake, and any officer can check it.
+Our certificates work the same way.
 
-```bash
-git clone https://github.com/prativahq/evalzero-sunbird-rc.git   # install
-cd evalzero-sunbird-rc
-docker compose up -d                                             # make it live
+<Steps>
+  <Step title="We sign the certificate's data">
+    The learner's name, course, completion date and grade are packaged as a **Verifiable Credential**
+    (a W3C-standard JSON document) and **digitally signed** with a secret **private key**.
+  </Step>
+  <Step title="The private key never leaves the vault">
+    That key lives locked inside **HashiCorp Vault**. Our services don't hold a copy — they send data
+    *to* Vault and Vault returns a signature. Nothing to leak, nothing to steal.
+  </Step>
+  <Step title="Anyone can verify with the public key">
+    The certificate carries a **QR code** and an issuer id (a **DID**). On scan, the verifier looks up
+    the issuer's **public key** and checks the signature. Match → genuine. One edited character → the
+    signature breaks → fake.
+  </Step>
+</Steps>
+
+<Info>
+  **Why not just a PDF?** A normal PDF can be edited in minutes. A signed credential **can't be
+  forged** — the signature is mathematically tied to the exact values, and only our vaulted private
+  key can produce it.
+</Info>
+
+## The signing chain
+
+The services depend on each other bottom-up — this is also the order they must start in
+(see [Dependencies](/rc/dependencies)):
+
+```
+Vault (holds private keys)
+  └─ identity / DID (signs as an issuer, resolves public keys)
+       └─ credential-schema (the certificate's shape)
+            └─ credential (issue · verify · render PDF)
+                 └─ registry / LMS (the API you call)
 ```
 
-RC is compose-based, so `docker compose up -d` **creates** its containers (registry, credential,
-schema, vault, its own Keycloak + stores) on first run — no separate build step.
+- **Vault** — the safe holding the signing keys. Boots **sealed**; must be unsealed each start.
+- **identity** — the DID service. Creates the issuer identity, asks Vault to sign, and on verify
+  resolves the issuer's DID to its public key. Certificate verification depends on it being live.
+- **credential-schema** — stores what fields a certificate has.
+- **credential** — issues, verifies and renders (PDF/SVG) credentials.
+- **registry** — the core entity store and the main API surface.
 
-## Services
+## Services & host ports
+
+RC's host ports are remapped to a **1xxxx band** (via `docker-compose.override.yml`) so it can
+coexist with the other stacks on the box.
 
 | Service | Container | Host port | Purpose |
 | --- | --- | --- | --- |
 | Registry (core) | `evalzero-sunbird-rc-registry-1` | `18091` | Entities / claims (`RC_BASE`) |
 | Credentials | `evalzero-sunbird-rc-credential-1` | `13000` | Issue / verify / render (`RC_CRED_BASE`) |
 | Credential schema | `evalzero-sunbird-rc-credential-schema-1` | `3333` | Schema service (`RC_SCHEMA_BASE`) |
-| Vault | `evalzero-sunbird-rc-vault-1` | `8200` | Signing keys |
-| Identity (Keycloak) | `evalzero-sunbird-rc-keycloak-1` | net | RC's own realm |
-| Support | db · es · redis · kafka · zookeeper | net | RC's backing stores |
+| Identity (DID) | `evalzero-sunbird-rc-identity-1` | `3332` | Issuer DID create / resolve / sign |
+| Vault | `evalzero-sunbird-rc-vault-1` | `8200` | Signing keys (boots sealed) |
+| Keycloak | `evalzero-sunbird-rc-keycloak-1` | `18083` | RC's own realm (auth off for the cert flow) |
+| Support | db · es · redis · kafka · zookeeper · minio | net / 1xxxx | RC's backing stores |
 
 ## EvalZero wiring (`.env`)
+
+The LMS talks to RC over these — proxied in `server/src/routes/credentials.routes.ts`:
 
 ```bash
 RC_BASE=http://localhost:18091         # registry
 RC_CRED_BASE=http://localhost:13000    # credentials
 RC_SCHEMA_BASE=http://localhost:3333   # credential-schema
 RC_ISSUE_ENABLED=true
-RC_ISSUER_DID=did:issuer:…
-RC_SCHEMA_ID=did:schema:…
+RC_ISSUER_DID=did:issuer:…             # who signs (created in RC)
+RC_SCHEMA_ID=did:schema:…              # certificate shape
+RC_TEMPLATE_ID=…                       # PDF/HTML render template
 ```
 
 <Warning>
-  Only `vault` runs by default; the rest of the RC stack is stopped. Bring the compose stack up
-  before issuing a certificate, then `docker ps` to confirm registry / credential / schema are
-  healthy.
+  RC brings its **own** Postgres, Vault, Keycloak, Elasticsearch, Redis, Kafka and Zookeeper — it
+  does **not** reuse the `sunbird-local` infra. Bring the stack up with `./build-and-run.sh` before
+  issuing a certificate, then `docker ps` to confirm registry / credential / schema / identity are
+  healthy. If `RC_ISSUE_ENABLED=false`, you can leave RC stopped entirely.
 </Warning>

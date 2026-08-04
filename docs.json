@@ -76,7 +76,7 @@
           },
           {
             "group": "RC — Credentials",
-            "pages": ["rc/overview", "rc/startup"]
+            "pages": ["rc/overview", "rc/setup", "rc/dependencies", "rc/startup"]
           },
           {
             "group": "Infrastructure",
