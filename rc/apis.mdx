@@ -1,0 +1,162 @@
+---
+title: RC — APIs
+description: The credential endpoints the LMS exposes and the RC services they proxy to.
+---
+
+The LMS never calls RC directly from the browser — it proxies through the Express server so the
+`templateId` and identity headers stay server-side. Two routers do this
+(`server/src/routes/credentials.routes.ts`):
+
+| Mount | Auth | Purpose |
+| --- | --- | --- |
+| `/api/rc/*` | **requireAuth** | Authenticated proxy to the three RC services (issue / verify / render / schema / registry) |
+| `/api/public/*` | **none** | Read-only public verification — a recruiter scanning a QR is not logged in |
+
+Every upstream call is decorated with identity/tracing headers (`X-Request-ID`, `x-source: lms`,
+`x-consumer-id: <userId>`), mirroring the convention in `learner.routes` / `chat.routes`.
+
+## Public verification (no auth)
+
+<Card title="GET /api/public/certificate/:id" icon="qrcode">
+  What the certificate **QR code** opens. Fetches the signed credential from RC (never trusts a PDF),
+  checks the proof, and returns only the fields needed to render a verification result.
+</Card>
+
+```bash
+curl -s https://lms.evalzero.com/api/public/certificate/did:rcw:abc123 | jq
+```
+
+```json
+{
+  "verified": true,
+  "status": "ISSUED",
+  "checks": { "proof": "OK", "revoked": "OK", "expired": "OK" },
+  "issuerTrusted": true,
+  "credentialId": "did:rcw:abc123",
+  "issuer": "did:issuer:bd52c6cc-…",
+  "issuanceDate": "2026-08-04T10:30:00Z",
+  "subject": {
+    "learnerName": "Test User",
+    "courseName": "Teacher Professional Development",
+    "grade": "Pass",
+    "completionDate": "2026-08-04",
+    "issuerName": "EvalZero"
+  }
+}
+```
+
+<Info>
+  `verified` is `true` only when the proof is valid **and** the issuer matches `RC_ISSUER_DID`. It
+  calls both `/credentials/:id/verify` and `/credentials/:id` (for the subject) in parallel. Returns
+  `404` if the credential isn't found, `502` if RC is unreachable.
+</Info>
+
+## Render a certificate (auth)
+
+<Card title="GET /api/rc/render/:id?format=pdf|html|svg" icon="file-pdf">
+  Renders a certificate by injecting the `Accept` + `templateId` headers a browser `<a>`/`<iframe>`
+  can't set. Lets the client link straight to a cert while the RC template id stays server-side.
+</Card>
+
+```bash
+# default pdf — inline, filename certificate-<id8>.pdf
+curl -s "http://localhost:3002/api/rc/render/did:rcw:abc123?format=pdf" -o cert.pdf
+```
+
+| `format` | Upstream `Accept` | Response |
+| --- | --- | --- |
+| `pdf` (default) | `application/pdf` | PDF, `Content-Disposition: inline` |
+| `html` | `text/html` | Rendered HTML |
+| `svg` | `image/svg+xml` | SVG |
+
+## Authenticated RC proxy (`/api/rc/*`)
+
+Three sub-paths, each rewritten to a different RC service:
+
+| LMS route | → RC service | Upstream path |
+| --- | --- | --- |
+| `/api/rc/credentials/*` | credentials (`RC_CRED_BASE` :13000) | `/credentials/*` |
+| `/api/rc/schema/*` | credential-schema (`RC_SCHEMA_BASE` :3333) | `/credential-schema/*` |
+| `/api/rc/registry/*` | registry core (`RC_BASE` :18091) | `/api/v1/*` |
+
+### Credentials
+
+| Method & path | Does |
+| --- | --- |
+| `POST /api/rc/credentials/issue` | Mint (sign) a course-completion VC |
+| `GET /api/rc/credentials/:id` | Fetch / render a credential (`Accept: application/json \| application/pdf \| text/html \| image/svg+xml`) |
+| `GET /api/rc/credentials/:id/verify` | Verify a credential → `{ status, checks[] }` |
+| `DELETE /api/rc/credentials/:id` | Revoke a credential |
+
+<AccordionGroup>
+  <Accordion title="POST /api/rc/credentials/issue — request shape">
+    ```json
+    {
+      "credential": {
+        "@context": ["https://www.w3.org/2018/credentials/v1", "…term-mapped context…"],
+        "type": ["VerifiableCredential"],
+        "issuer": "did:issuer:bd52c6cc-…",
+        "issuanceDate": "2026-08-04T10:30:00Z",
+        "credentialSubject": {
+          "id": "did:rcw:learner-user1",
+          "learnerName": "Test User",
+          "courseName": "Teacher Professional Development",
+          "completionDate": "2026-08-04",
+          "grade": "Pass"
+        }
+      },
+      "credentialSchemaId": "did:schema:9557f611-…",
+      "credentialSchemaVersion": "1.0.0",
+      "tags": ["course-completion"]
+    }
+    ```
+    Returns the signed VC including its `proof` and a credential `id` (`did:rcw:…`) used for verify / render.
+  </Accordion>
+  <Accordion title="GET /api/rc/credentials/:id/verify — response">
+    ```json
+    { "status": "ISSUED", "checks": [ { "active": "OK", "revoked": "OK", "expired": "OK", "proof": "OK" } ] }
+    ```
+    `proof: OK` = signature valid and data untampered.
+  </Accordion>
+</AccordionGroup>
+
+### Schema
+
+| Method & path | Does |
+| --- | --- |
+| `POST /api/rc/schema` | Create a credential schema (define the certificate's fields) |
+| `GET /api/rc/schema/:id` | Read a schema |
+| `PUT /api/rc/schema/:id/:version` | Update a schema version |
+
+<Note>
+  Schema create needs a `schemaVersion` field, and the issuer DID must be clean (no stray `service`
+  block) or verification later returns `proof: NOK`. See the RC build notes.
+</Note>
+
+### Registry
+
+| Method & path | Does |
+| --- | --- |
+| `POST /api/rc/registry/:Entity` | Create a registry entity (e.g. `Teacher`) |
+| `GET /api/rc/registry/:Entity/:id` | Read an entity |
+| `POST /api/rc/registry/:Entity/search` | Search entities |
+
+## Calling RC directly (bypassing the LMS)
+
+For scripts / debugging you can hit the RC services on the 1xxxx host band — no LMS in the middle:
+
+```bash
+# issue
+curl -s -X POST localhost:13000/credentials/issue -H 'Content-Type: application/json' -d @vc.json | jq
+# verify
+curl -s localhost:13000/credentials/<id>/verify | jq
+# render pdf (templateId is a HEADER, not a query param)
+curl -s localhost:13000/credentials/<id> -H 'Accept: application/pdf' -H 'templateId: <tpl>' -o cert.pdf
+# one-shot demo of the whole chain
+./demo-certificate.sh
+```
+
+<Warning>
+  `templateId` is passed as an **HTTP header**, not a query parameter — a common first mistake
+  (render otherwise returns *"Template id is required"*). The LMS `render` route sets it for you.
+</Warning>
